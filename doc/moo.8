@@ -1,0 +1,93 @@
+.\" generated with Ronn-NG/v0.9.1
+.\" http://github.com/apjanke/ronn-ng/tree/0.9.1
+.TH "MOO" "8" "February 2026" "Slide"
+.SH "NAME"
+\fBmoo\fR
+.SH "NAME"
+moo \- Control the Moo Continuous Block Tracking kernel module\.
+.SH "SYNOPSIS"
+\fBmoo <sub\-command> [<args>]\fR
+.SH "DESCRIPTION"
+\fBmoo\fR is the userspace tool used to manage the moocbt kernel module\. It provides an interface to create, delete, reload, transition, and configure on\-disk snapshots and certain parameters of the kernel module itself\.
+.P
+This manual page describes \fBmoo\fR briefly\. More detail is available in the Git repository located at https://github\.com/slidehq/moocbt\.
+.SH "OPTIONS"
+.nf
+\-c cache\-size
+     Specify how big the in\-memory data cache can grow to (in MB)\. Defaults to 300 MB\.
+
+\-f fallocate
+     Specify the maximum size of the COW file on disk\.
+.fi
+.SH "SUB\-COMMANDS"
+.SS "setup\-snapshot"
+\fBmoo setup\-snapshot [\-c <cache size>] [\-f <fallocate>] <block device> <cow file path> <minor>\fR
+.P
+Sets up a snapshot of \fB<block device>\fR, saving all COW data to \fB<cow file path>\fR\. The snapshot device will be \fB/dev/moocbt<minor>\fR\. The minor number will be used as a reference number for all other \fBmoo\fR commands\. \fB<cow file path>\fR must be a path on the \fB<block device>\fR\.
+.SS "reload\-snapshot"
+\fBmoo reload\-snapshot [\-c <cache size>] <block device> <cow file> <minor>\fR
+.P
+Reloads a snapshot\. This command is meant to be run before the block device is mounted, after a reboot or after the driver is unloaded\. It notifies the kernel driver to expect the block device specified to come back online\. This command requires that the snapshot was cleanly unmounted in snapshot mode beforehand\. If this is not the case, the snapshot will be put into the failure state once it attempts to come online\. The minor number will be used as a reference number for all other \fBmoo\fR commands\.
+.SS "reload\-incremental"
+\fBmoo reload\-incremental [\-c <cache size>] <block device> <cow file> <minor>\fR
+.P
+Reloads a block device that was in incremental mode\. See \fBreload\-snapshot\fR for restrictions\.
+.SS "transition\-to\-incremental"
+\fBmoo transition\-to\-incremental <minor>\fR
+.P
+Transitions a snapshot COW file to incremental mode, which only tracks which blocks have changed since a snapshot started\. This will remove the associated snapshot device\.
+.SS "transition\-to\-snapshot"
+\fBmoo transition\-to\-snapshot [\-f <fallocate>] <cow file> <minor>\fR
+.P
+Transitions a block device in incremental mode to snapshot mode\. This call ensures no writes are missed between tearing down the incremental and setting up the new snapshot\. The new snapshot data will be recorded in \fB<cow file>\fR\. The old cow file will still exist after this and can be used to efficiently copy only changed blocks using a tool succh as \fBupdate\-img\fR\.
+.SS "destroy"
+\fBmoo destroy <minor>\fR
+.P
+Cleanly and completely removes the snapshot or incremental, unlinking the associated COW file\.
+.SS "reconfigure"
+\fBmoo reconfigure [\-c <cache size>] <minor>\fR
+.P
+Allows you to reconfigure various parameters of a snapshot while it is online\. Currently only the index cache size (given in MB) can be changed dynamically\.
+.SS "expand\-cow\-file"
+\fBmoo expand\-cow\-file <size> <minor>\fR
+.P
+Expands cow file in snapshot mode by size (given in megabytes)\.
+.SS "reconfigure\-auto\-expand"
+\fBmoo reconfigure\-auto\-expand [\-n <steps limit>] <step size> <minor>\fR
+.P
+Enable auto\-expand of cow file in snapshot mode by \fIstep size\fR (given in megabytes)\. Auto\-expand works in that way that at least \fIreserved space\fR (given in megabytes) is left available after each step for regular users of filesystem\.
+.SS "EXAMPLES"
+\fB# moo setup\-snapshot /dev/sda1 /var/backup/moocow 4\fR
+.P
+This command will set up a new COW snapshot device tracking \fB/dev/sda1\fR at \fB/dev/moocbt4\fR\. This block device is backed by a new file created at the path \fB/var/backup/moocow\fR\.
+.P
+\fB# moo transition\-to\-incremental 4\fR
+.P
+Transitions the snapshot specified by the minor number to incremental mode\.
+.P
+\fB# moo transition\-to\-snapshot /var/backup/moocow1 4\fR
+.P
+Cleanly transitions the incremental to a new snapshot, using \fB/var/backup/moocow1\fR as the new COW file\. At this point a second backup can be taken, either doing a full copy with a tool like \fBdd\fR or an incremental copy using a tool such as \fBupdate\-img\fR, if a previous snapshot backup exists\.
+.P
+\fB# moo reconfigure \-c 400 4\fR
+.P
+Reconfigures the block device to have an in\-memory index cache size of 400 MB\.
+.P
+\fB# moo destroy 4\fR
+.P
+This will stop tracking \fB/dev/sda1\fR, remove the associated \fB/dev/moocbt4\fR (since the device is in snapshot mode), delete the COW file backing it, and perform all other cleanup\.
+.P
+\fB# moo reload\-snapshot /dev/sda1 /var/backup/moocow1 4\fR
+.P
+After a reboot, this command may be performed in the early stages of boot, before the block device is mounted read\-write\. This will notify the driver to expect a block device \fB/dev/sda1\fR that was left in snapshot mode to come online with a COW file located at \fB/var/backup/moocow1\fR (relative to the mountpoint), and that the reloaded snapshot should come online at minor number 4\. If a problem is discovered when the block device comes online, this block device will be put into the failure state, which will be reported in \fB/proc/moocbt\-info\fR
+.P
+\fB# moo reload\-incremental /dev/sda5 /var/backup/moocow1 4\fR
+.P
+This will act the same as \fBreload\-snapshot\fR, but for a device that was left in incremental mode\.
+.SH "BUGS"
+.SH "AUTHORS"
+Tom Caputi (tcaputi@datto\.com)
+.P
+Slide (it@slide\.tech)
+.SH "COPYRIGHT"
+Additional contributions by Slide are Copyright (C) 2026 Project Orca Inc

@@ -2,6 +2,7 @@
 
 /*
  * Copyright (C) 2022 Datto Inc.
+ * Additional contributions by Slide are Copyright (C) 2026 Project Orca Inc.
  */
 
 #include "filesystem.h"
@@ -28,17 +29,17 @@ static int kern_path(const char *name, unsigned int flags, struct path *path)
         struct nameidata nd;
         int ret = path_lookup(name, flags, &nd);
         if (!ret) {
-                path->dentry = dattobd_get_nd_dentry(nd);
-                path->mnt = dattobd_get_nd_mnt(nd);
+                path->dentry = moocbt_get_nd_dentry(nd);
+                path->mnt = moocbt_get_nd_mnt(nd);
         }
         return ret;
 }
 #endif
 
 /**
- * dattobd_kernel_read() - This is a wrapper around kernel_read enhanced for
+ * moocbt_kernel_read() - This is a wrapper around kernel_read enhanced for
  * systems that don't support it.
- * @dfilp: A dattobd mutable file object.
+ * @dfilp: A moocbt mutable file object.
  * @buf: A buffer with at least @count entries.
  * @count: The number of bytes to read from @filp.
  * @pos: Set to the offset into @filp identifying the first sequential access.
@@ -46,7 +47,7 @@ static int kern_path(const char *name, unsigned int flags, struct path *path)
  *
  * Return: The number of bytes read or a negative errno.
  */
-static ssize_t dattobd_kernel_read(struct dattobd_mutable_file *dfilp, struct snap_device* dev, void *buf, size_t count,
+static ssize_t moocbt_kernel_read(struct moocbt_mutable_file *dfilp, struct snap_device* dev, void *buf, size_t count,
                                    loff_t *pos)
 {
         ssize_t ret;
@@ -56,7 +57,7 @@ static ssize_t dattobd_kernel_read(struct dattobd_mutable_file *dfilp, struct sn
 
         if(dfilp){
                 // no need for making file mutable at read?
-                dattobd_mutable_file_unlock(dfilp);
+                moocbt_mutable_file_unlock(dfilp);
 #ifndef HAVE_KERNEL_READ_PPOS
                 //#if LINUX_VERSION_CODE < KERNEL_VERSION(4,14,0)
                 old_fs = get_fs();
@@ -67,7 +68,7 @@ static ssize_t dattobd_kernel_read(struct dattobd_mutable_file *dfilp, struct sn
 #else
                 ret=kernel_read(dfilp->filp, buf, count, pos);
 #endif
-                dattobd_mutable_file_lock(dfilp);
+                moocbt_mutable_file_lock(dfilp);
                 return ret;
         }else{
 		LOG_DEBUG("DIO: reading %lu sectors...", count / SECTOR_SIZE);
@@ -80,9 +81,9 @@ static ssize_t dattobd_kernel_read(struct dattobd_mutable_file *dfilp, struct sn
 }
 
 /**
- * dattobd_kernel_write() - This is a wrapper around kernel_write enhanced for
+ * moocbt_kernel_write() - This is a wrapper around kernel_write enhanced for
  * systems that don't support it.
- * @dfilp: A dattobd mutable file object.
+ * @dfilp: A moocbt mutable file object.
  * @buf: A buffer with at least @count entries.
  * @count: The number of bytes to write to @filp.
  * @pos: Set to the offset into @filp identifying the first sequential access.
@@ -90,7 +91,7 @@ static ssize_t dattobd_kernel_read(struct dattobd_mutable_file *dfilp, struct sn
  *
  * Return: The number of bytes written or a negative errno.
  */
-static ssize_t dattobd_kernel_write(struct dattobd_mutable_file *dfilp, struct snap_device* dev, const void *buf,
+static ssize_t moocbt_kernel_write(struct moocbt_mutable_file *dfilp, struct snap_device* dev, const void *buf,
                                     size_t count, loff_t *pos)
 {
         ssize_t ret;
@@ -99,7 +100,7 @@ static ssize_t dattobd_kernel_write(struct dattobd_mutable_file *dfilp, struct s
 #endif
 
         if(dfilp){
-                dattobd_mutable_file_unlock(dfilp);
+                moocbt_mutable_file_unlock(dfilp);
 #ifndef HAVE_KERNEL_WRITE_PPOS
                 //#if LINUX_VERSION_CODE < KERNEL_VERSION(4,14,0)
 
@@ -110,7 +111,7 @@ static ssize_t dattobd_kernel_write(struct dattobd_mutable_file *dfilp, struct s
 #else
                 ret = kernel_write(dfilp->filp, buf, count, pos);
 #endif
-                dattobd_mutable_file_lock(dfilp);
+                moocbt_mutable_file_lock(dfilp);
                 return ret;
         }else{
 		LOG_DEBUG("DIO: writing %lu sectors...", count / SECTOR_SIZE);
@@ -125,7 +126,7 @@ static ssize_t dattobd_kernel_write(struct dattobd_mutable_file *dfilp, struct s
 /**
  * file_io() - Reads or writes to the supplied file.
  *
- * @dfilp: A dattobd mutable file object.
+ * @dfilp: A moocbt mutable file object.
  * @dev: The snap device object, where file is located.
  * @is_write: An integer encoded bool indicating a write or read operation.
  * @buf: Input/output buffer for write/read, respectively.
@@ -137,7 +138,7 @@ static ssize_t dattobd_kernel_write(struct dattobd_mutable_file *dfilp, struct s
  * * 0 - success
  * * !0 - errno indicating the error
  */
-int file_io(struct dattobd_mutable_file *dfilp, struct snap_device* dev, int is_write, void *buf, sector_t offset,
+int file_io(struct moocbt_mutable_file *dfilp, struct snap_device* dev, int is_write, void *buf, sector_t offset,
             unsigned long len, unsigned long *done)
 {
         ssize_t ret;
@@ -147,9 +148,9 @@ int file_io(struct dattobd_mutable_file *dfilp, struct snap_device* dev, int is_
                 *done = 0;
 
         if (is_write)
-                ret = dattobd_kernel_write(dfilp, dev, buf, len, &off);
+                ret = moocbt_kernel_write(dfilp, dev, buf, len, &off);
         else
-                ret = dattobd_kernel_read(dfilp, dev, buf, len, &off);
+                ret = moocbt_kernel_read(dfilp, dev, buf, len, &off);
 
         if (unlikely(ret < 0)) {
                 LOG_ERROR((int)ret, "error performing file '%s': %llu, %lu",
@@ -173,21 +174,21 @@ int file_io(struct dattobd_mutable_file *dfilp, struct snap_device* dev, int is_
         return ret;
 }
 
-inline void file_close(struct dattobd_mutable_file *dfilp){
-        // force closing dattobd_mutable_file
+inline void file_close(struct moocbt_mutable_file *dfilp){
+        // force closing moocbt_mutable_file
         if(unlikely(!dfilp))
                 return;
         if(atomic_read(&dfilp->writers) > 0){
                 LOG_WARN("closing file that is still unlocked");
         }
-        dattobd_mutable_file_unlock(dfilp);
+        moocbt_mutable_file_unlock(dfilp);
         __file_close_raw(dfilp->filp);
 }
 
 inline void __file_close_raw(struct file *filp){
         if(unlikely(!filp))
                 return;
-        mark_inode_dirty(dattobd_get_dentry(filp)->d_inode);
+        mark_inode_dirty(moocbt_get_dentry(filp)->d_inode);
         filp_close(filp, NULL);
 }
 
@@ -220,7 +221,7 @@ int file_open(const char *filename, int flags, struct file **filp)
                 LOG_ERROR(ret, "error creating/opening file '%s' - %d",
                           filename, ret);
                 goto error;
-        } else if (!S_ISREG(dattobd_get_dentry(f)->d_inode->i_mode)) {
+        } else if (!S_ISREG(moocbt_get_dentry(f)->d_inode->i_mode)) {
                 ret = -EINVAL;
                 LOG_ERROR(ret, "'%s' is not a regular file", filename);
                 goto error;
@@ -381,7 +382,7 @@ static int path_get_absolute_pathname(const struct path *path, char **buf,
                 goto error;
         }
 
-        pathname = dattobd_d_path(path, page_buf, PAGE_SIZE);
+        pathname = moocbt_d_path(path, page_buf, PAGE_SIZE);
         if (IS_ERR(pathname)) {
                 ret = PTR_ERR(pathname);
                 pathname = NULL;
@@ -422,7 +423,7 @@ error:
  * file_get_absolute_pathname() - Gets an absolute path from the supplied
  *                                &struct file object.
  *
- * @dfilp: A dattobd mutable file object.
+ * @dfilp: A moocbt mutable file object.
  * @buf: Output pathname. Use kfree() on the returned buffer.
  * @len_res: Pathname length of the result, NULL means don't care.
  *
@@ -432,7 +433,7 @@ error:
  * * 0 - success
  * * !0 - errno indicating the error.
  */
-int file_get_absolute_pathname(const struct dattobd_mutable_file *dfilp, char **buf,
+int file_get_absolute_pathname(const struct moocbt_mutable_file *dfilp, char **buf,
                                int *len_res)
 {
         struct path path;
@@ -584,13 +585,13 @@ error:
 }
 
 /**
- * dattobd_should_remove_suid() - Determines flags needed to remove suid.
+ * moocbt_should_remove_suid() - Determines flags needed to remove suid.
  *
  * @dentry: A &struct dentry object pointer.
  *
  * Return: The necessary flags.
  */
-static int dattobd_should_remove_suid(struct dentry *dentry)
+static int moocbt_should_remove_suid(struct dentry *dentry)
 {
         mode_t mode = dentry->d_inode->i_mode;
         int kill = 0;
@@ -613,7 +614,7 @@ static int dattobd_should_remove_suid(struct dentry *dentry)
 }
 
 /**
- * dattobd_do_truncate() - Modifies the attributes of the &struct file object
+ * moocbt_do_truncate() - Modifies the attributes of the &struct file object
  *                         to indicate a new file size.  For security the SUID
  *                         and/or SGID bits are removed from the @filp object
  *                         as well.
@@ -629,7 +630,7 @@ static int dattobd_should_remove_suid(struct dentry *dentry)
  * * 0 - success
  * * !0 - errno indicating the error.
  */
-static int dattobd_do_truncate(struct dentry *dentry, loff_t length,
+static int moocbt_do_truncate(struct dentry *dentry, loff_t length,
                                unsigned int time_attrs, struct file *filp)
 {
         int ret;
@@ -645,12 +646,12 @@ static int dattobd_do_truncate(struct dentry *dentry, loff_t length,
                 newattrs.ia_valid |= ATTR_FILE;
         }
 
-        ret = dattobd_should_remove_suid(dentry);
+        ret = moocbt_should_remove_suid(dentry);
         if (ret)
                 newattrs.ia_valid |= ret | ATTR_FORCE;
 
-        dattobd_inode_lock(dentry->d_inode);
-        // replaced with dattobd_mutable_file lock/unlock mechanism
+        moocbt_inode_lock(dentry->d_inode);
+        // replaced with moocbt_mutable_file lock/unlock mechanism
         // inode_attr_unlock(dentry->d_inode);
 #ifdef HAVE_NOTIFY_CHANGE_2
         //#if LINUX_VERSION_CODE < KERNEL_VERSION(3,13,0)
@@ -664,7 +665,7 @@ static int dattobd_do_truncate(struct dentry *dentry, loff_t length,
         ret = notify_change(dentry, &newattrs, NULL);
 #endif
         // inode_attr_lock(dentry->d_inode);
-        dattobd_inode_unlock(dentry->d_inode);
+        moocbt_inode_unlock(dentry->d_inode);
 
         return ret;
 }
@@ -672,16 +673,16 @@ static int dattobd_do_truncate(struct dentry *dentry, loff_t length,
 /**
  * file_truncate() - Truncates a file to a given length.
  *
- * @dfilp: A dattobd mutable file object.
+ * @dfilp: A moocbt mutable file object.
  * @len: The truncation length in bytes.
  *
- * Special treatment of SUID and SGID is performed.  See @dattobd_do_truncate.
+ * Special treatment of SUID and SGID is performed.  See @moocbt_do_truncate.
  *
  * Return:
  * * 0 - success
  * * !0 - errno indicating the error.
  */
-int file_truncate(struct dattobd_mutable_file *dfilp, loff_t len)
+int file_truncate(struct moocbt_mutable_file *dfilp, loff_t len)
 {
         struct inode *inode;
         struct dentry *dentry;
@@ -690,21 +691,21 @@ int file_truncate(struct dattobd_mutable_file *dfilp, loff_t len)
         dentry = dfilp->dentry;
         inode = dfilp->inode;
 
-        dattobd_mutable_file_unlock(dfilp);
+        moocbt_mutable_file_unlock(dfilp);
 
 #ifdef HAVE_SB_START_WRITE
         //#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,6,0)
         sb_start_write(inode->i_sb);
 #endif
 
-        ret = dattobd_do_truncate(dentry, len, ATTR_MTIME | ATTR_CTIME, dfilp->filp);
+        ret = moocbt_do_truncate(dentry, len, ATTR_MTIME | ATTR_CTIME, dfilp->filp);
 
 #ifdef HAVE_SB_START_WRITE
         //#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,6,0)
         sb_end_write(inode->i_sb);
 #endif
 
-        dattobd_mutable_file_lock(dfilp);
+        moocbt_mutable_file_lock(dfilp);
 
         if (ret) {
                 LOG_ERROR(ret, "error performing truncation");
@@ -723,7 +724,7 @@ error:
  * within the range specified by @offset and @length.  Any subregion within
  * this domain that didn't have data before the call will contain zeroes. (TODO: is that true?)
  *
- * @dfilp: A dattobd mutable file object.
+ * @dfilp: A moocbt mutable file object.
  * @offset: The offset into @f indicating the start of the allocation.
  * @length: The number of byte to allocate starting at @offset.
  *
@@ -731,7 +732,7 @@ error:
  * * 0 - success
  * * !0 - errno indicating the error.
  */
-static int try_real_fallocate(struct dattobd_mutable_file *dfilp, uint64_t offset, uint64_t length)
+static int try_real_fallocate(struct moocbt_mutable_file *dfilp, uint64_t offset, uint64_t length)
 {
         int ret;
         loff_t off = offset;
@@ -741,7 +742,7 @@ static int try_real_fallocate(struct dattobd_mutable_file *dfilp, uint64_t offse
         if (off + len > inode->i_sb->s_maxbytes || off + len < 0)
                 return -EFBIG;
 
-        dattobd_mutable_file_unlock(dfilp);
+        moocbt_mutable_file_unlock(dfilp);
 #ifdef HAVE_SB_START_WRITE
         sb_start_write(inode->i_sb);
 #endif
@@ -765,7 +766,7 @@ static int try_real_fallocate(struct dattobd_mutable_file *dfilp, uint64_t offse
 #ifdef HAVE_SB_START_WRITE
         sb_end_write(inode->i_sb);
 #endif
-        dattobd_mutable_file_lock(dfilp);
+        moocbt_mutable_file_lock(dfilp);
 
         return ret;
 }
@@ -775,7 +776,7 @@ static int try_real_fallocate(struct dattobd_mutable_file *dfilp, uint64_t offse
  * within the range specified by @offset and @length.  Attempts to use
  * @try_real_fallocate with a fallback of writing zeroes if that fails.
  *
- * @dfilp: A dattobd mutable file object.
+ * @dfilp: A moocbt mutable file object.
  * @dev: The snap device object, where file is located.
  * @offset: The offset into @f indicating the start of the allocation.
  * @length: The number of byte to allocate starting at @offset.
@@ -785,7 +786,7 @@ static int try_real_fallocate(struct dattobd_mutable_file *dfilp, uint64_t offse
  * * 0 - success
  * * !0 - errno indicating the error.
  */
-int file_allocate(struct dattobd_mutable_file *dfilp, struct snap_device* dev,  uint64_t offset, uint64_t length, uint64_t *done)
+int file_allocate(struct moocbt_mutable_file *dfilp, struct snap_device* dev,  uint64_t offset, uint64_t length, uint64_t *done)
 {
         int ret = 0;
         char *page_buf = NULL;
@@ -887,14 +888,14 @@ error:
  * * 0 - success
  * * !0 - errno indicating the error.
  */
-int file_unlink(struct dattobd_mutable_file *dfilp)
+int file_unlink(struct moocbt_mutable_file *dfilp)
 {
         int ret = 0;
         struct inode *dir_inode = dfilp->dentry->d_parent->d_inode;
         struct dentry *file_dentry = dfilp->dentry;
-        struct vfsmount *mnt = dattobd_get_mnt(dfilp->filp);
+        struct vfsmount *mnt = moocbt_get_mnt(dfilp->filp);
 
-        // replaced with dattobd_mutable_file lock/unlock mechanism
+        // replaced with moocbt_mutable_file lock/unlock mechanism
         // if(file_dentry->d_inode && inode_attr_is_locked(file_dentry->d_inode)){
         //         inode_attr_unlock(file_dentry->d_inode);
         // }
@@ -912,7 +913,7 @@ int file_unlink(struct dattobd_mutable_file *dfilp)
                 goto mnt_error;
         }
 
-        dattobd_mutable_file_unlock(dfilp);
+        moocbt_mutable_file_unlock(dfilp);
 
 #ifdef HAVE_VFS_UNLINK_2
         //#if LINUX_VERSION_CODE < KERNEL_VERSION(3,13,0)
@@ -932,7 +933,7 @@ int file_unlink(struct dattobd_mutable_file *dfilp)
 
 error:
         mnt_drop_write(mnt);
-        dattobd_mutable_file_lock(dfilp);
+        moocbt_mutable_file_lock(dfilp);
 
 mnt_error:
         iput(dir_inode);
@@ -996,23 +997,23 @@ void path_put(const struct path *path)
 #ifndef HAVE_INODE_LOCK
 //#if LINUX_VERSION_CODE < KERNEL_VERSION(4,5,0)
 /**
- * dattobd_inode_lock() - Locks the inode's mutex.
+ * moocbt_inode_lock() - Locks the inode's mutex.
  * @inode: The &struct inode object pointer.
  *
  * Reimplementation from Linux kernel since it isn't universally available.
  */
-void dattobd_inode_lock(struct inode *inode)
+void moocbt_inode_lock(struct inode *inode)
 {
         mutex_lock(&inode->i_mutex);
 }
 
 /**
- * dattobd_inode_unlock() - Unlocks the inode's mutex.
+ * moocbt_inode_unlock() - Unlocks the inode's mutex.
  * @inode: The &struct inode object pointer.
  *
  * Reimplementation from Linux kernel since it isn't universally available.
  */
-void dattobd_inode_unlock(struct inode *inode)
+void moocbt_inode_unlock(struct inode *inode)
 {
         mutex_unlock(&inode->i_mutex);
 }
@@ -1026,7 +1027,7 @@ static struct kmem_cache **vma_lock_cache = (VMA_LOCK_CACHEP_ADDR != 0) ?
 	(struct kmem_cache **) (VMA_LOCK_CACHEP_ADDR + (long long)(((void *)kfree) - (void *)KFREE_ADDR)) : NULL;
 #endif
 
-struct vm_area_struct* dattobd_vm_area_allocate(struct mm_struct* mm)
+struct vm_area_struct* moocbt_vm_area_allocate(struct mm_struct* mm)
 {
         struct vm_area_struct *vma;
         static const struct vm_operations_struct dummy_vm_ops = {};
@@ -1058,12 +1059,12 @@ struct vm_area_struct* dattobd_vm_area_allocate(struct mm_struct* mm)
 	return vma;
 }
 
-void dattobd_vm_area_free(struct vm_area_struct *vma)
+void moocbt_vm_area_free(struct vm_area_struct *vma)
 {
         kmem_cache_free(*vm_area_cache, vma);
 }
 
-void dattobd_mm_lock(struct mm_struct* mm)
+void moocbt_mm_lock(struct mm_struct* mm)
 {
 #ifdef HAVE_MMAP_WRITE_LOCK
 	mmap_write_lock(mm);
@@ -1072,7 +1073,7 @@ void dattobd_mm_lock(struct mm_struct* mm)
 #endif
 }
 
-void dattobd_mm_unlock(struct mm_struct* mm)
+void moocbt_mm_unlock(struct mm_struct* mm)
 {
 #ifdef HAVE_MMAP_WRITE_LOCK
 	mmap_write_unlock(mm);
@@ -1081,14 +1082,14 @@ void dattobd_mm_unlock(struct mm_struct* mm)
 #endif
 }
 
-// removed file_switch_lock as it is managed by the dattobd_mutable_file
+// removed file_switch_lock as it is managed by the moocbt_mutable_file
 // void file_switch_lock(struct file* filp, bool lock, bool mark_dirty)
 // {
 //         struct inode* inode;
 
 //         if(!filp) return;
 
-//         inode= dattobd_get_dentry(filp)->d_inode;
+//         inode= moocbt_get_dentry(filp)->d_inode;
 //         igrab(inode);
 
 //         if(lock){
@@ -1142,8 +1143,8 @@ write_bio:
 		goto out;
 	}
 
-        dattobd_bio_set_dev(new_bio, bdev);
-        dattobd_set_bio_ops(new_bio, REQ_OP_READ, 0);
+        moocbt_bio_set_dev(new_bio, bdev);
+        moocbt_set_bio_ops(new_bio, REQ_OP_READ, 0);
         //from bio_helper.h
         bio_sector(new_bio) = start_sect;
 	bio_idx(new_bio) = 0;
@@ -1183,7 +1184,7 @@ write_bio:
 		pg->mapping = dev->sd_cow_inode->i_mapping;
 
 
-	ret = dattobd_submit_bio_wait(new_bio);
+	ret = moocbt_submit_bio_wait(new_bio);
 	if (ret) {
 		LOG_ERROR(ret, "submit_bio_wait() error!");
 		goto out;
@@ -1248,8 +1249,8 @@ read_bio:
 		LOG_ERROR(ret, "error allocating bio (read) - bs = %p", bs);
 		goto out;
 	}
-        dattobd_bio_set_dev(new_bio, bdev);
-        dattobd_set_bio_ops(new_bio, REQ_OP_READ, 0);
+        moocbt_bio_set_dev(new_bio, bdev);
+        moocbt_set_bio_ops(new_bio, REQ_OP_READ, 0);
         bio_sector(new_bio) = start_sect;
 	bio_idx(new_bio) = 0;
 
@@ -1284,7 +1285,7 @@ read_bio:
 	if (dev->sd_cow_inode)
 		pg->mapping = dev->sd_cow_inode->i_mapping;
 
-        ret = dattobd_submit_bio_wait(new_bio);
+        ret = moocbt_submit_bio_wait(new_bio);
 	if (ret) {
 		LOG_ERROR(ret, "submit_bio_wait() error!");
 		goto out;
@@ -1335,17 +1336,17 @@ sector_t sector_by_offset(struct snap_device*dev, size_t offset)
 	return SECTOR_INVALID;
 }
 
-struct dattobd_mutable_file* dattobd_mutable_file_wrap(struct file* filp){
-        struct dattobd_mutable_file *dfilp = kzalloc(sizeof(struct dattobd_mutable_file), GFP_KERNEL);
+struct moocbt_mutable_file* moocbt_mutable_file_wrap(struct file* filp){
+        struct moocbt_mutable_file *dfilp = kzalloc(sizeof(struct moocbt_mutable_file), GFP_KERNEL);
         long ret;
 
         if(unlikely(!dfilp)){
-                LOG_ERROR(-ENOMEM, "error allocating dattobd mutable file");
+                LOG_ERROR(-ENOMEM, "error allocating moocbt mutable file");
                 return ERR_PTR(-ENOMEM);
         }
 
         dfilp->filp = filp;
-        dfilp->dentry = dattobd_get_dentry(filp);
+        dfilp->dentry = moocbt_get_dentry(filp);
 
         if(unlikely(IS_ERR(dfilp->dentry))){
                 LOG_ERROR((int)PTR_ERR(dfilp->dentry), "error getting dentry from file");
@@ -1373,7 +1374,7 @@ struct dattobd_mutable_file* dattobd_mutable_file_wrap(struct file* filp){
                 goto error;
         }
 
-        dfilp->mnt = dattobd_get_mnt(filp);
+        dfilp->mnt = moocbt_get_mnt(filp);
 
         if(unlikely(IS_ERR(dfilp->mnt))){
                 LOG_ERROR((int)PTR_ERR(dfilp->mnt), "error getting vfsmount from file");
@@ -1401,7 +1402,7 @@ error:
         return ERR_PTR(ret);
 }
 
-void dattobd_mutable_file_unlock(struct dattobd_mutable_file* dfilp){
+void moocbt_mutable_file_unlock(struct moocbt_mutable_file* dfilp){
         if(dfilp){
                 igrab(dfilp->inode);
                 dfilp->inode->i_flags &= ~S_IMMUTABLE;
@@ -1410,7 +1411,7 @@ void dattobd_mutable_file_unlock(struct dattobd_mutable_file* dfilp){
         }
 }
 
-void dattobd_mutable_file_lock(struct dattobd_mutable_file* dfilp){
+void moocbt_mutable_file_lock(struct moocbt_mutable_file* dfilp){
         if(dfilp){
                 if(atomic_dec_and_test(&dfilp->writers)){
                         igrab(dfilp->inode);
@@ -1420,7 +1421,7 @@ void dattobd_mutable_file_lock(struct dattobd_mutable_file* dfilp){
         }
 }
 
-void dattobd_mutable_file_unwrap(struct dattobd_mutable_file* dfilp){
+void moocbt_mutable_file_unwrap(struct moocbt_mutable_file* dfilp){
         if(dfilp){
                 kfree(dfilp);
         }

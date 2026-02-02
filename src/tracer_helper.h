@@ -2,6 +2,7 @@
 
 /*
  * Copyright (C) 2022 Datto Inc.
+ * Additional contributions by Slide are Copyright (C) 2026 Project Orca Inc.
  */
 
 #ifndef TRACER_HELPER_H_
@@ -21,12 +22,12 @@
              i++, dev = ACCESS_ONCE(snap_devices[i]))
 #define tracer_for_each_full(dev, i)                                           \
         for (i = 0, dev = ACCESS_ONCE(snap_devices[i]);                        \
-             i < dattobd_max_snap_devices;                                     \
+             i < moocbt_max_snap_devices;                                     \
              i++, dev = ACCESS_ONCE(snap_devices[i]))
 
 // returns true if tracing struct's base device queue matches that of bio
 #define tracer_queue_matches_bio(dev, bio)                                     \
-        (bdev_get_queue((dev)->sd_base_dev->bdev) == dattobd_bio_get_queue(bio))
+        (bdev_get_queue((dev)->sd_base_dev->bdev) == moocbt_bio_get_queue(bio))
 
 // returns true if tracing struct's sector range matches the sector of the bio
 #define tracer_sector_matches_bio(dev, bio)                                    \

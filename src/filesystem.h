@@ -2,6 +2,7 @@
 
 /*
  * Copyright (C) 2022 Datto Inc.
+ * Additional contributions by Slide are Copyright (C) 2026 Project Orca Inc.
  */
 
 #ifndef FILESYSTEM_H_
@@ -23,7 +24,7 @@
 // #define file_unlock(filp) file_switch_lock(filp, false, false)
 // #define file_unlock_mark_dirty(filp) file_switch_lock(filp, false, true)
 
-// replaced with dattobd_mutable_file lock/unlock mechanism
+// replaced with moocbt_mutable_file lock/unlock mechanism
 // INODE Attribute Locking is based on the S_IMMUTABLE flag
 // #define inode_attr_is_locked(inode) ( (inode->i_flags) & S_IMMUTABLE )
 // #define inode_attr_lock(inode) do{ inode->i_flags |= S_IMMUTABLE; } while(0)
@@ -31,23 +32,23 @@
 
 #ifndef HAVE_STRUCT_PATH
 //#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,20)
-#define dattobd_get_dentry(f) (f)->f_dentry
-#define dattobd_get_mnt(f) (f)->f_vfsmnt
+#define moocbt_get_dentry(f) (f)->f_dentry
+#define moocbt_get_mnt(f) (f)->f_vfsmnt
 #else
-#define dattobd_get_dentry(f) (f)->f_path.dentry
-#define dattobd_get_mnt(f) (f)->f_path.mnt
+#define moocbt_get_dentry(f) (f)->f_path.dentry
+#define moocbt_get_mnt(f) (f)->f_path.mnt
 #endif
 
 #ifndef HAVE_PATH_PUT
-#define dattobd_d_path(path, page_buf, page_size)                              \
+#define moocbt_d_path(path, page_buf, page_size)                              \
         d_path((path)->dentry, (path)->mnt, page_buf, page_size)
-#define dattobd_get_nd_dentry(nd) (nd).dentry
-#define dattobd_get_nd_mnt(nd) (nd).mnt
+#define moocbt_get_nd_dentry(nd) (nd).dentry
+#define moocbt_get_nd_mnt(nd) (nd).mnt
 #else
-#define dattobd_d_path(path, page_buf, page_size)                              \
+#define moocbt_d_path(path, page_buf, page_size)                              \
         d_path(path, page_buf, page_size)
-#define dattobd_get_nd_dentry(nd) (nd).path.dentry
-#define dattobd_get_nd_mnt(nd) (nd).path.mnt
+#define moocbt_get_nd_dentry(nd) (nd).path.dentry
+#define moocbt_get_nd_mnt(nd) (nd).path.mnt
 #endif
 
 // takes a value and the log of the value it should be rounded up to
@@ -58,7 +59,7 @@ struct file;
 struct dentry;
 struct vfsmount;
 
-struct dattobd_mutable_file {
+struct moocbt_mutable_file {
         struct file *filp;
         struct dentry *dentry;
         struct inode *inode;
@@ -67,13 +68,13 @@ struct dattobd_mutable_file {
         atomic_t writers;
 };
 
-struct dattobd_mutable_file* dattobd_mutable_file_wrap(struct file*);
+struct moocbt_mutable_file* moocbt_mutable_file_wrap(struct file*);
 
-void dattobd_mutable_file_unlock(struct dattobd_mutable_file*);
+void moocbt_mutable_file_unlock(struct moocbt_mutable_file*);
 
-void dattobd_mutable_file_lock(struct dattobd_mutable_file*);
+void moocbt_mutable_file_lock(struct moocbt_mutable_file*);
 
-void dattobd_mutable_file_unwrap(struct dattobd_mutable_file*);
+void moocbt_mutable_file_unwrap(struct moocbt_mutable_file*);
 
 #ifndef HAVE_STRUCT_PATH
 //#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,20)
@@ -89,16 +90,16 @@ typedef mode_t fmode_t;
 
 int file_open(const char *filename, int flags, struct file **filp);
 
-int file_io(struct dattobd_mutable_file *dfilp, struct snap_device* dev, int is_write, void *buf, sector_t offset,
+int file_io(struct moocbt_mutable_file *dfilp, struct snap_device* dev, int is_write, void *buf, sector_t offset,
             unsigned long len, unsigned long *done);
 
-int file_truncate(struct dattobd_mutable_file *dfilp, loff_t len);
+int file_truncate(struct moocbt_mutable_file *dfilp, loff_t len);
 
-int file_allocate(struct dattobd_mutable_file *dfilp, struct snap_device* dev, uint64_t offset, uint64_t length, uint64_t *done);
+int file_allocate(struct moocbt_mutable_file *dfilp, struct snap_device* dev, uint64_t offset, uint64_t length, uint64_t *done);
 
-int file_unlink(struct dattobd_mutable_file* dfilp);
+int file_unlink(struct moocbt_mutable_file* dfilp);
 
-void file_close(struct dattobd_mutable_file *filp);
+void file_close(struct moocbt_mutable_file *filp);
 
 void __file_close_raw(struct file *dfilp);
 
@@ -110,7 +111,7 @@ int dentry_get_relative_pathname(struct dentry *dentry, char **buf,
                                  int *len_res);
 #endif
 
-int file_get_absolute_pathname(const struct dattobd_mutable_file *dfilp, char **buf,
+int file_get_absolute_pathname(const struct moocbt_mutable_file *dfilp, char **buf,
                                int *len_res);
 
 int pathname_to_absolute(const char *pathname, char **buf, int *len_res);
@@ -133,21 +134,21 @@ void path_put(const struct path *path);
 
 #ifndef HAVE_INODE_LOCK
 //#if LINUX_VERSION_CODE < KERNEL_VERSION(4,5,0)
-void dattobd_inode_lock(struct inode *inode);
+void moocbt_inode_lock(struct inode *inode);
 
-void dattobd_inode_unlock(struct inode *inode);
+void moocbt_inode_unlock(struct inode *inode);
 #else
-#define dattobd_inode_lock inode_lock
-#define dattobd_inode_unlock inode_unlock
+#define moocbt_inode_lock inode_lock
+#define moocbt_inode_unlock inode_unlock
 #endif
 
-struct vm_area_struct* dattobd_vm_area_allocate(struct mm_struct* mm);
+struct vm_area_struct* moocbt_vm_area_allocate(struct mm_struct* mm);
 
-void dattobd_vm_area_free(struct vm_area_struct *vma);
+void moocbt_vm_area_free(struct vm_area_struct *vma);
 
-void dattobd_mm_lock(struct mm_struct* mm);
+void moocbt_mm_lock(struct mm_struct* mm);
 
-void dattobd_mm_unlock(struct mm_struct* mm);
+void moocbt_mm_unlock(struct mm_struct* mm);
 
 int file_write_block(struct snap_device* dev, const void* block, size_t offset, size_t len);
 

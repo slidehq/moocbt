@@ -2,12 +2,13 @@
 
 /*
  * Copyright (C) 2022 Datto Inc.
+ * Additional contributions by Slide are Copyright (C) 2026 Project Orca Inc.
  */
 
 #ifndef COW_MANAGER_H_
 #define COW_MANAGER_H_
 
-#include "dattobd.h"
+#include "moocbt.h"
 #include "filesystem.h"
 
 #ifndef __KERNEL__
@@ -17,7 +18,7 @@
 #define COW_SECTION_SIZE 4096
 
 #define cow_write_filler_mapping(cm, pos) __cow_write_mapping(cm, pos, 1)
-extern const unsigned long dattobd_cow_ext_buf_size;
+extern const unsigned long moocbt_cow_ext_buf_size;
 
 /**
  * struct cow_section - maintains data and usage statistics for a cow section.
@@ -49,7 +50,7 @@ struct cow_auto_expand_manager {
 };
 
 struct cow_manager {
-        struct dattobd_mutable_file *dfilp; // the file the cow manager is writing to
+        struct moocbt_mutable_file *dfilp; // the file the cow manager is writing to
         uint32_t flags; // flags representing current state of cow manager
         uint64_t curr_pos; // current write head position
         uint64_t data_offset; // starting offset of data

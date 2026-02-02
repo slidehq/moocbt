@@ -51,14 +51,14 @@ pkgclean:
 
 pkgprep: pkgclean
 	$(PKGBUILDROOT_CREATE_CMD)
-	tar --exclude=./pkgbuild --exclude=.git --transform 's,^\.,dattobd,' -czf $(BUILDDIR)/SOURCES/dattobd.tar.gz .
-	cp dist/dattobd.spec $(BUILDDIR)/SPECS/dattobd.spec
+	tar --exclude=./pkgbuild --exclude=.git --transform 's,^\.,moocbt,' -czf $(BUILDDIR)/SOURCES/moocbt.tar.gz .
+	cp dist/moocbt.spec $(BUILDDIR)/SPECS/moocbt.spec
 
 deb: pkgprep
-	debbuild $(PKGBUILDFLAGS) $(BUILDDIR)/SPECS/dattobd.spec
+	debbuild $(PKGBUILDFLAGS) $(BUILDDIR)/SPECS/moocbt.spec
 
 rpm: pkgprep
-	rpmbuild $(PKGBUILDFLAGS) $(BUILDDIR)/SPECS/dattobd.spec
+	rpmbuild $(PKGBUILDFLAGS) $(BUILDDIR)/SPECS/moocbt.spec
 
 install:
 	$(MAKE) -C src install

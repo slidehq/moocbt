@@ -1,0 +1,5 @@
+#!/bin/sh
+
+if [ ! -c /dev/moocbt-ctl ] ; then
+	exec /sbin/modprobe moocbt >/dev/null 2>&1
+fi

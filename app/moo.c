@@ -2,6 +2,7 @@
 
 /*
  * Copyright (C) 2015 Datto Inc.
+ * Additional contributions by Slide are Copyright (C) 2026 Project Orca Inc.
  */
 
 #include <stdio.h>
@@ -12,20 +13,20 @@
 #include <limits.h>
 #include <ctype.h>
 
-#include "libdattobd.h"
+#include "libmoocbt.h"
 
 static void print_help(int status){
 	printf("Usage:\n");
-	printf("\tdbdctl setup-snapshot [-c <cache size>] [-f fallocate] <block device> <cow file> <minor>\n");
-	printf("\tdbdctl reload-snapshot [-c <cache size>] <block device> <cow file> <minor>\n");
-	printf("\tdbdctl reload-incremental [-c <cache size>] <block device> <cow file> <minor>\n");
-	printf("\tdbdctl destroy <minor>\n");
-	printf("\tdbdctl transition-to-incremental <minor>\n");
-	printf("\tdbdctl transition-to-snapshot [-f fallocate] <cow file> <minor>\n");
-	printf("\tdbdctl reconfigure [-c <cache size>] <minor>\n");
-	printf("\tdbdctl expand-cow-file <size> <minor>\n");
-	printf("\tdbdctl reconfigure-auto-expand [-r <reserved space>] <step size> <minor>\n");
-	printf("\tdbdctl help\n\n");
+	printf("\tmoo setup-snapshot [-c <cache size>] [-f fallocate] <block device> <cow file> <minor>\n");
+	printf("\tmoo reload-snapshot [-c <cache size>] <block device> <cow file> <minor>\n");
+	printf("\tmoo reload-incremental [-c <cache size>] <block device> <cow file> <minor>\n");
+	printf("\tmoo destroy <minor>\n");
+	printf("\tmoo transition-to-incremental <minor>\n");
+	printf("\tmoo transition-to-snapshot [-f fallocate] <cow file> <minor>\n");
+	printf("\tmoo reconfigure [-c <cache size>] <minor>\n");
+	printf("\tmoo expand-cow-file <size> <minor>\n");
+	printf("\tmoo reconfigure-auto-expand [-r <reserved space>] <step size> <minor>\n");
+	printf("\tmoo help\n\n");
 	printf("<cow file> should be specified as an absolute path.\n");
 	printf("cache size should be provided in bytes, and fallocate should be provided in megabytes.\n");
 	printf("in expand-cow-file and reconfigure-auto-expand size should be provided in megabytes.\n");
@@ -150,7 +151,7 @@ static int handle_setup_snap(int argc, char **argv){
 	ret = parse_ui(argv[optind + 2], &minor);
 	if(ret) goto error;
 
-	return dattobd_setup_snapshot(minor, bdev, cow, fallocated_space, cache_size);
+	return moocbt_setup_snapshot(minor, bdev, cow, fallocated_space, cache_size);
 
 error:
 	perror("error interpreting setup snapshot parameters");
@@ -188,7 +189,7 @@ static int handle_reload_snap(int argc, char **argv){
 	ret = parse_ui(argv[optind + 2], &minor);
 	if(ret) goto error;
 
-	return dattobd_reload_snapshot(minor, bdev, cow, cache_size);
+	return moocbt_reload_snapshot(minor, bdev, cow, cache_size);
 
 error:
 	perror("error interpreting reload snapshot parameters");
@@ -226,7 +227,7 @@ static int handle_reload_inc(int argc, char **argv){
 	ret = parse_ui(argv[optind + 2], &minor);
 	if(ret) goto error;
 
-	return dattobd_reload_incremental(minor, bdev, cow, cache_size);
+	return moocbt_reload_incremental(minor, bdev, cow, cache_size);
 
 error:
 	perror("error interpreting reload incremental parameters");
@@ -246,7 +247,7 @@ static int handle_destroy(int argc, char **argv){
 	ret = parse_ui(argv[1], &minor);
 	if(ret) goto error;
 
-	return dattobd_destroy(minor);
+	return moocbt_destroy(minor);
 
 error:
 	perror("error interpreting destroy parameters");
@@ -266,7 +267,7 @@ static int handle_transition_inc(int argc, char **argv){
 	ret = parse_ui(argv[1], &minor);
 	if(ret) goto error;
 
-	return dattobd_transition_incremental(minor);
+	return moocbt_transition_incremental(minor);
 
 error:
 	perror("error interpreting transition to incremental parameters");
@@ -303,7 +304,7 @@ static int handle_transition_snap(int argc, char **argv){
 	ret = parse_ui(argv[optind + 1], &minor);
 	if(ret) goto error;
 
-	return dattobd_transition_snapshot(minor, cow, fallocated_space);
+	return moocbt_transition_snapshot(minor, cow, fallocated_space);
 
 error:
 	perror("error interpreting transition to snapshot parameters");
@@ -337,7 +338,7 @@ static int handle_reconfigure(int argc, char **argv){
 	ret = parse_ui(argv[optind], &minor);
 	if(ret) goto error;
 
-	return dattobd_reconfigure(minor, cache_size);
+	return moocbt_reconfigure(minor, cache_size);
 
 error:
 	perror("error interpreting reconfigure parameters");
@@ -361,7 +362,7 @@ static int handle_expand_cow_file(int argc, char **argv){
 	ret = parse_ui(argv[2], &minor);
 	if(ret) goto error;
 
-	return dattobd_expand_cow_file(minor, size);
+	return moocbt_expand_cow_file(minor, size);
 
 error:
 	perror("error interpreting expand parameters");
@@ -397,7 +398,7 @@ static int handle_reconfigure_auto_expand(int argc, char **argv){
 	ret = parse_ui(argv[optind+1], &minor);
 	if(ret) goto error;
 
-	return dattobd_reconfigure_auto_expand(minor, step_size, reserved_space);
+	return moocbt_reconfigure_auto_expand(minor, step_size, reserved_space);
 
 error:
 	perror("error interpreting reconfigure auto expand parameters");
@@ -411,7 +412,7 @@ int main(int argc, char **argv){
 	//check argc
 	if(argc < 2) print_help(-1);
 
-	if(access("/dev/datto-ctl", F_OK) != 0){
+	if(access("/dev/moocbt-ctl", F_OK) != 0){
 		errno = EINVAL;
 		perror("driver does not appear to be loaded");
 		return -1;

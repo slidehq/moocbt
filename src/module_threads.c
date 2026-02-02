@@ -2,6 +2,7 @@
 
 /*
  * Copyright (C) 2022 Datto Inc.
+ * Additional contributions by Slide are Copyright (C) 2026 Project Orca Inc.
  */
 
 #include "module_threads.h"
@@ -128,7 +129,7 @@ int snap_cow_thread(void *data)
                         // if we're in the fail state just send back an IO error
                         // and free the bio
                         if (is_failed) {
-                                dattobd_bio_endio(bio,
+                                moocbt_bio_endio(bio,
                                                   -EIO); // end the bio with an
                                                          // IO error
                                 continue;
@@ -142,7 +143,7 @@ int snap_cow_thread(void *data)
                                 tracer_set_fail_state(dev, ret);
                         }
 
-                        dattobd_bio_endio(bio, (ret) ? -EIO : 0);
+                        moocbt_bio_endio(bio, (ret) ? -EIO : 0);
                 } else {
                         if (is_failed) {
                                 bio_free_clone(bio);
@@ -195,7 +196,7 @@ int snap_mrf_thread(void *data)
                 bio = bio_queue_dequeue(bq);
 
                 // submit the original bio to the block IO layer
-                dattobd_bio_op_set_flag(bio, DATTOBD_PASSTHROUGH);
+                moocbt_bio_op_set_flag(bio, MOOCBT_PASSTHROUGH);
 
                 // blk_qc_t (*)(struct request_queue *, struct bio *)’                 // {aka ‘unsigned int (*)(struct request_queue *, struct bio *)’} but argument is of type ‘struct snap_device *’
 

@@ -2,6 +2,7 @@
 
 /*
  * Copyright (C) 2022-2023 Datto Inc.
+ * Additional contributions by Slide are Copyright (C) 2026 Project Orca Inc.
  */
 
 #include "includes.h"
@@ -17,7 +18,7 @@
 #endif
 
 /**
- * dattobd_bio_get_queue() - Gets the request queue for the given block
+ * moocbt_bio_get_queue() - Gets the request queue for the given block
  * I/O operation.
  *
  * @bio: The &struct bio which describes the I/O
@@ -25,7 +26,7 @@
  * Return:
  * The @request_queue containing the @bio.
  */
-struct request_queue *dattobd_bio_get_queue(struct bio *bio)
+struct request_queue *moocbt_bio_get_queue(struct bio *bio)
 {
 #ifdef HAVE_BIO_BI_BDEV
         //#if LINUX_VERSION_CODE < KERNEL_VERSION(4,14,0)
@@ -36,13 +37,13 @@ struct request_queue *dattobd_bio_get_queue(struct bio *bio)
 }
 
 /**
- * dattobd_bio_set_dev() - Sets the block device associated with the
+ * moocbt_bio_set_dev() - Sets the block device associated with the
  * block I/O operation.
  *
  * @bio: The &struct bio which describes the I/O
  * @bdev: The associated block device.
  */
-void dattobd_bio_set_dev(struct bio *bio, struct block_device *bdev)
+void moocbt_bio_set_dev(struct bio *bio, struct block_device *bdev)
 {
 #ifdef HAVE_BIO_BI_BDEV
         //#if LINUX_VERSION_CODE < KERNEL_VERSION(4,14,0)
@@ -53,11 +54,11 @@ void dattobd_bio_set_dev(struct bio *bio, struct block_device *bdev)
 }
 
 /**
- * dattobd_bio_copy_dev() - copies the block I/O operation from @src to @dst
+ * moocbt_bio_copy_dev() - copies the block I/O operation from @src to @dst
  * @src: the source bio
  * @dst: the destination bio
  */
-void dattobd_bio_copy_dev(struct bio *dst, struct bio *src)
+void moocbt_bio_copy_dev(struct bio *dst, struct bio *src)
 {
 #ifdef HAVE_BIO_BI_BDEV
         //#if LINUX_VERSION_CODE < KERNEL_VERSION(4,14,0)
@@ -89,14 +90,14 @@ void dattobd_bio_copy_dev(struct bio *dst, struct bio *src)
 
 #ifndef HAVE_ENUM_REQ_OP 
 /**
- * dattobd_set_bio_ops() - Sets the I/O operation and additional flags in the
+ * moocbt_set_bio_ops() - Sets the I/O operation and additional flags in the
  * @bio.
  *
  * @bio: The &struct bio which describes the I/O
  * @op: The operation to be performed.
  * @op_flags: Additional flags.
  */
-void dattobd_set_bio_ops(struct bio *bio, req_op_t op, unsigned op_flags)
+void moocbt_set_bio_ops(struct bio *bio, req_op_t op, unsigned op_flags)
 {
         bio->bi_rw = 0;
 
@@ -125,14 +126,14 @@ void dattobd_set_bio_ops(struct bio *bio, req_op_t op, unsigned op_flags)
 #endif
 
 #if !defined(HAVE_BIO_BI_OPF) && defined(HAVE_ENUM_REQ_OP)
-void dattobd_set_bio_ops(struct bio *bio, req_op_t op, unsigned op_flags)
+void moocbt_set_bio_ops(struct bio *bio, req_op_t op, unsigned op_flags)
 {
        bio->bi_rw = 0;
        bio->bi_rw |= op ;
 }
 #endif
 /**
- * dattobd_bio_op_flagged() - Checks the bio for a given flag.
+ * moocbt_bio_op_flagged() - Checks the bio for a given flag.
  *
  * @bio: The &struct bio which describes the I/O
  * @flag: The operation flag to test.
@@ -141,31 +142,31 @@ void dattobd_set_bio_ops(struct bio *bio, req_op_t op, unsigned op_flags)
  * * 0 - not set
  * * !0 - set
  */
-int dattobd_bio_op_flagged(struct bio *bio, unsigned int flag)
+int moocbt_bio_op_flagged(struct bio *bio, unsigned int flag)
 {
         return bio->bi_rw & flag;
 }
 
 /**
- * dattobd_bio_op_set_flag() - Sets the given flag in the bio I/O
+ * moocbt_bio_op_set_flag() - Sets the given flag in the bio I/O
  * operation flags field.
  *
  * @bio: The &struct bio which describes the I/O
  * @flag: The operation flag to set.
  */
-void dattobd_bio_op_set_flag(struct bio *bio, unsigned int flag)
+void moocbt_bio_op_set_flag(struct bio *bio, unsigned int flag)
 {
         bio->bi_rw |= flag;
 }
 
 /**
- * dattobd_bio_op_clear_flag() - Clears the given flag in the bio I/O
+ * moocbt_bio_op_clear_flag() - Clears the given flag in the bio I/O
  * operation flags field.
  *
  * @bio: The &struct bio which describes the I/O
  * @flag: The operation flag to clear.
  */
-void dattobd_bio_op_clear_flag(struct bio *bio, unsigned int flag)
+void moocbt_bio_op_clear_flag(struct bio *bio, unsigned int flag)
 {
         bio->bi_rw &= ~flag;
 }
@@ -180,20 +181,20 @@ typedef enum req_opf req_op_t;
 
 
 /**
- * dattobd_set_bio_ops() - Sets the op and its flags.
+ * moocbt_set_bio_ops() - Sets the op and its flags.
  *
  * @bio: The &struct bio which describes the I/O
  * @op: The operation to be performed.
  * @op_flags: Additional flags.
  */
-void dattobd_set_bio_ops(struct bio *bio, req_op_t op, unsigned op_flags)
+void moocbt_set_bio_ops(struct bio *bio, req_op_t op, unsigned op_flags)
 {
         bio->bi_opf = 0;
         bio->bi_opf = op | op_flags;
 }
 
 /**
- * dattobd_bio_op_flagged() - Checks the bio for a given flag.
+ * moocbt_bio_op_flagged() - Checks the bio for a given flag.
  *
  * @bio: The &struct bio which describes the I/O
  * @flag: The operation flag to test.
@@ -202,31 +203,31 @@ void dattobd_set_bio_ops(struct bio *bio, req_op_t op, unsigned op_flags)
  * * 0 - not set
  * * !0 - set
  */
-int dattobd_bio_op_flagged(struct bio *bio, unsigned int flag)
+int moocbt_bio_op_flagged(struct bio *bio, unsigned int flag)
 {
         return bio->bi_opf & flag;
 }
 
 /**
- * dattobd_bio_op_set_flag() - Sets the given flag in the bio I/O
+ * moocbt_bio_op_set_flag() - Sets the given flag in the bio I/O
  * operation flags field.
  *
  * @bio: The &struct bio which describes the I/O
  * @flag: The operation flag to set.
  */
-void dattobd_bio_op_set_flag(struct bio *bio, unsigned int flag)
+void moocbt_bio_op_set_flag(struct bio *bio, unsigned int flag)
 {
         bio->bi_opf |= flag;
 }
 
 /**
- * dattobd_bio_op_clear_flag() - Clears the given flag in the bio I/O
+ * moocbt_bio_op_clear_flag() - Clears the given flag in the bio I/O
  * operation flags field.
  *
  * @bio: The &struct bio which describes the I/O
  * @flag: The operation flag to clear.
  */
-void dattobd_bio_op_clear_flag(struct bio *bio, unsigned int flag)
+void moocbt_bio_op_clear_flag(struct bio *bio, unsigned int flag)
 {
         bio->bi_opf &= ~flag;
 }
@@ -325,12 +326,12 @@ int submit_bio_wait(int rw, struct bio *bio)
 #ifdef HAVE_BIO_ENDIO_INT
 
 /**
- * dattobd_bio_endio() - end I/O on a bio
+ * moocbt_bio_endio() - end I/O on a bio
  *
  * @bio: The &struct bio which describes the I/O
  * @err: an errno
  */
-void dattobd_bio_endio(struct bio *bio, int err)
+void moocbt_bio_endio(struct bio *bio, int err)
 {
         bio_endio(bio, bio->bi_size, err);
 }
@@ -338,12 +339,12 @@ void dattobd_bio_endio(struct bio *bio, int err)
 #elif !defined HAVE_BIO_ENDIO_1
 
 /**
- * dattobd_bio_endio - end I/O on a bio
+ * moocbt_bio_endio - end I/O on a bio
  *
  * @bio: The &struct bio which describes the I/O
  * @err: an errno
  */
-void dattobd_bio_endio(struct bio *bio, int err)
+void moocbt_bio_endio(struct bio *bio, int err)
 {
         bio_endio(bio, err);
 }
@@ -351,12 +352,12 @@ void dattobd_bio_endio(struct bio *bio, int err)
 #elif defined HAVE_BLK_STATUS_T
 
 /**
- * dattobd_bio_endio - end I/O on a bio
+ * moocbt_bio_endio - end I/O on a bio
  *
  * @bio: The &struct bio which describes the I/O
  * @err: an errno
  */
-void dattobd_bio_endio(struct bio *bio, int err)
+void moocbt_bio_endio(struct bio *bio, int err)
 {
         bio->bi_status = errno_to_blk_status(err);
         bio_endio(bio);
@@ -365,12 +366,12 @@ void dattobd_bio_endio(struct bio *bio, int err)
 #else
 
 /**
- * dattobd_bio_endio - end I/O on a bio
+ * moocbt_bio_endio - end I/O on a bio
  *
  * @bio: The &struct bio which describes the I/O
  * @err: an errno
  */
-void dattobd_bio_endio(struct bio *bio, int err)
+void moocbt_bio_endio(struct bio *bio, int err)
 {
         bio->bi_error = err;
         bio_endio(bio);
@@ -409,7 +410,7 @@ static void __on_bio_read_complete(struct bio *bio, int err)
         }
 
         // change the bio into a write bio
-        dattobd_set_bio_ops(bio, REQ_OP_WRITE, 0);
+        moocbt_set_bio_ops(bio, REQ_OP_WRITE, 0);
         bio->bi_end_io = NULL;
 
         // reset the bio iterator to its original state
@@ -734,8 +735,8 @@ int bio_make_read_clone(struct bio_set *bs, struct tracing_params *tp,
         // populate read bio
         new_bio->bi_private = tp;
         new_bio->bi_end_io = on_bio_read_complete;
-        dattobd_bio_copy_dev(new_bio, orig_bio);
-        dattobd_set_bio_ops(new_bio, REQ_OP_READ, 0);
+        moocbt_bio_copy_dev(new_bio, orig_bio);
+        moocbt_set_bio_ops(new_bio, REQ_OP_READ, 0);
         bio_sector(new_bio) = sect;
         bio_idx(new_bio) = 0;
 #ifdef HAVE_BIO_BLKG

@@ -2,6 +2,7 @@
 
 /*
  * Copyright (C) 2025 Datto Inc.
+ * Additional contributions by Slide are Copyright (C) 2026 Project Orca Inc.
  */
 
 #ifndef STACK_LIMITS_H_
@@ -9,13 +10,13 @@
 
 #include "logging.h"
 
-// dattobd_bdev_stack_limits(request_queue, bdev, sector_t) -- our wrapper
+// moocbt_bdev_stack_limits(request_queue, bdev, sector_t) -- our wrapper
 
 // queue_limits_stack_bdev(queue_limits, bdev, sector_t, pfx) -- from 6.9
 // bdev_stack_limits(queue_limits, bdev, sector_t) -- from 2.6.33 up to 5.8
 // blk_stack_limits(queue_limits, queue_limits, sector_t) -- from 2.6.31
 
-// dattobd_blk_set_stacking_limits(queue_limits) -- our wrapper
+// moocbt_blk_set_stacking_limits(queue_limits) -- our wrapper
 
 // blk_set_stacking_limits(queue_limits) -- from 3.3
 // blk_set_default_limits(queue_limits) -- from 2.6.31 to 6.1
@@ -25,7 +26,7 @@
 
 // queue_limits_stack_bdev is our top priority, if it is available -- we use it
 
-#define dattobd_bdev_stack_limits(rq, bd, sec) queue_limits_stack_bdev(&(rq)->limits, bdev, sec, DATTO_TAG)
+#define moocbt_bdev_stack_limits(rq, bd, sec) queue_limits_stack_bdev(&(rq)->limits, bdev, sec, MOOCBT_TAG)
 
 #else
 
@@ -41,7 +42,7 @@ static int bdev_stack_limits(struct queue_limits *t, struct block_device *bdev, 
 
 #endif
 
-#define dattobd_bdev_stack_limits(rq, bd, sec) bdev_stack_limits(&(rq)->limits, bdev, sec)
+#define moocbt_bdev_stack_limits(rq, bd, sec) bdev_stack_limits(&(rq)->limits, bdev, sec)
 
 #endif
 

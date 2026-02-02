@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 // Copyright (C) 2023 Datto Inc.
+ * Additional contributions by Slide are Copyright (C) 2026 Project Orca Inc.
 
 #ifndef FTRACE_HOOKING_H_INCLUDE
 #define FTRACE_HOOKING_H_INCLUDE

@@ -2,6 +2,7 @@
 
 /*
  * Copyright (C) 2022 Datto Inc.
+ * Additional contributions by Slide are Copyright (C) 2026 Project Orca Inc.
  */
 
 #include "snap_handle.h"
@@ -125,8 +126,8 @@ int snap_handle_read_bio(const struct snap_device *dev, struct bio *bio)
         bio_orig_size = bio_size(bio);
         bio_orig_sect = bio_sector(bio);
 
-        dattobd_bio_set_dev(bio, dev->sd_base_dev->bdev);
-        dattobd_set_bio_ops(bio, REQ_OP_READ, READ_SYNC);
+        moocbt_bio_set_dev(bio, dev->sd_base_dev->bdev);
+        moocbt_set_bio_ops(bio, REQ_OP_READ, READ_SYNC);
 
         // detect fastpath for bios completely contained within either the cow
         // file or the base device
@@ -136,7 +137,7 @@ int snap_handle_read_bio(const struct snap_device *dev, struct bio *bio)
 
         // submit the bio to the base device and wait for completion
         if (mode != READ_MODE_COW_FILE) {
-                ret = dattobd_submit_bio_wait(bio);
+                ret = moocbt_submit_bio_wait(bio);
                 if (ret) {
                         LOG_ERROR(ret,
                                   "error reading from base device for read");

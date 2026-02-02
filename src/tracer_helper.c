@@ -2,6 +2,7 @@
 
 /*
  * Copyright (C) 2022 Datto Inc.
+ * Additional contributions by Slide are Copyright (C) 2026 Project Orca Inc.
  */
 
 #include "tracer_helper.h"
@@ -53,7 +54,7 @@ bool tracer_is_bio_for_dev(struct snap_device *dev, struct bio *bio)
 #elif defined HAVE_BIO_BI_PARTNO
         if(unlikely(bio->bi_disk == NULL))
                 return false;
-        if(dattobd_get_start_sect_by_gendisk_for_bio(bio->bi_disk, bio->bi_partno, &offset)){
+        if(moocbt_get_start_sect_by_gendisk_for_bio(bio->bi_disk, bio->bi_partno, &offset)){
                 return false;
         }
         bio_sector_start += offset;

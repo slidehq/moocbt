@@ -14,7 +14,7 @@ static struct mutex snap_device_lock;
 int init_snap_device_array(void){
     LOG_DEBUG("allocate global device array");
     snap_devices =
-            kzalloc(dattobd_max_snap_devices * sizeof(struct snap_device *),
+            kzalloc(moocbt_max_snap_devices * sizeof(struct snap_device *),
                     GFP_KERNEL);
     if (!snap_devices) {
             return -ENOMEM;

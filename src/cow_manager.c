@@ -2,6 +2,7 @@
 
 /*
  * Copyright (C) 2022 Datto Inc.
+ * Additional contributions by Slide are Copyright (C) 2026 Project Orca Inc.
  */
 
 #include "cow_manager.h"
@@ -29,14 +30,14 @@
 #define get_zeroed_pages(flags, order)                                         \
         __get_free_pages(((flags) | __GFP_ZERO), order)
 
-const unsigned long dattobd_cow_ext_buf_size = sizeof(struct fiemap_extent) * 1024;
+const unsigned long moocbt_cow_ext_buf_size = sizeof(struct fiemap_extent) * 1024;
 
-inline void __close_and_destroy_dattobd_mutable_file(struct dattobd_mutable_file *dfilp){
+inline void __close_and_destroy_moocbt_mutable_file(struct moocbt_mutable_file *dfilp){
         file_close(dfilp);
-        dattobd_mutable_file_unwrap(dfilp);
+        moocbt_mutable_file_unwrap(dfilp);
 }
 
-inline int __open_dattobd_mutable_file(const char *path, int flags, struct dattobd_mutable_file **dfilp){
+inline int __open_moocbt_mutable_file(const char *path, int flags, struct moocbt_mutable_file **dfilp){
         struct file* filp = NULL;
         int ret;
 
@@ -47,7 +48,7 @@ inline int __open_dattobd_mutable_file(const char *path, int flags, struct datto
                 return ret;
         }
 
-        *dfilp = dattobd_mutable_file_wrap(filp);
+        *dfilp = moocbt_mutable_file_wrap(filp);
 
         if(IS_ERR(*dfilp)){
                 LOG_ERROR(-ENOMEM, "failed to wrap file pointer");
@@ -421,7 +422,7 @@ void cow_free_members(struct cow_manager *cm)
 
         if (cm->dfilp) {
                 file_unlink(cm->dfilp);
-                __close_and_destroy_dattobd_mutable_file(cm->dfilp);
+                __close_and_destroy_moocbt_mutable_file(cm->dfilp);
                 cm->dfilp = NULL;
         }
 }
@@ -461,7 +462,7 @@ int cow_sync_and_free(struct cow_manager *cm)
                 goto error;
 
         if (cm->dfilp){
-                __close_and_destroy_dattobd_mutable_file(cm->dfilp);
+                __close_and_destroy_moocbt_mutable_file(cm->dfilp);
                 cm->dfilp = NULL;
         }
 
@@ -509,7 +510,7 @@ int cow_sync_and_close(struct cow_manager *cm)
 	if(ret) goto error;
 
         if (cm->dfilp){
-                __close_and_destroy_dattobd_mutable_file(cm->dfilp);
+                __close_and_destroy_moocbt_mutable_file(cm->dfilp);
                 cm->dfilp = NULL;
         }
 
@@ -536,7 +537,7 @@ int cow_reopen(struct cow_manager *cm, const char *pathname)
         int ret;
 
         LOG_DEBUG("reopening cow file");
-        ret = __open_dattobd_mutable_file(pathname, 0, &cm->dfilp);
+        ret = __open_moocbt_mutable_file(pathname, 0, &cm->dfilp);
         if (ret)
                 goto error;
 
@@ -550,7 +551,7 @@ int cow_reopen(struct cow_manager *cm, const char *pathname)
 error:
         LOG_ERROR(ret, "error reopening cow manager");
         if (cm->dfilp){
-                __close_and_destroy_dattobd_mutable_file(cm->dfilp);
+                __close_and_destroy_moocbt_mutable_file(cm->dfilp);
                 cm->dfilp = NULL;
         }
 
@@ -615,7 +616,7 @@ int cow_reload(const char *path, uint64_t elements, unsigned long sect_size,
         }
 
         LOG_DEBUG("opening cow file");
-        ret = __open_dattobd_mutable_file(path, 0, &cm->dfilp);
+        ret = __open_moocbt_mutable_file(path, 0, &cm->dfilp);
         if (ret)
                 goto error;
 
@@ -660,7 +661,7 @@ int cow_reload(const char *path, uint64_t elements, unsigned long sect_size,
 error:
         LOG_ERROR(ret, "error during cow manager initialization");
         if (cm->dfilp){
-                __close_and_destroy_dattobd_mutable_file(cm->dfilp);
+                __close_and_destroy_moocbt_mutable_file(cm->dfilp);
                 cm->dfilp = NULL;
         }
 
@@ -714,7 +715,7 @@ int cow_init(struct snap_device *dev, const char *path, uint64_t elements, unsig
         }
 
         LOG_DEBUG("creating cow file");
-        ret = __open_dattobd_mutable_file(path, O_CREAT | O_TRUNC, &cm->dfilp);
+        ret = __open_moocbt_mutable_file(path, O_CREAT | O_TRUNC, &cm->dfilp);
         if (ret)
                 goto error;
 
@@ -777,7 +778,7 @@ error:
         LOG_ERROR(ret, "error during cow manager initialization");
         if (cm->dfilp){
                 file_unlink(cm->dfilp);
-                __close_and_destroy_dattobd_mutable_file(cm->dfilp);
+                __close_and_destroy_moocbt_mutable_file(cm->dfilp);
                 cm->dfilp = NULL;
         }
 
@@ -960,7 +961,7 @@ retry:
                 if(cm->auto_expand){
                         kstatfs_ret = 0;
                         if(cm->dev && cm->dev->sd_base_dev){
-                                kstatfs_ret = dattobd_get_kstatfs(cm->dev->sd_base_dev->bdev, &kstatfs);
+                                kstatfs_ret = moocbt_get_kstatfs(cm->dev->sd_base_dev->bdev, &kstatfs);
                         }
 
                         if(!kstatfs_ret){
@@ -1099,7 +1100,7 @@ int cow_get_file_extents(struct snap_device* dev, struct file* filp)
 	struct page *pg;
 	__user uint8_t *cow_ext_buf;
 
-        unsigned long cow_ext_buf_size = ALIGN(dattobd_cow_ext_buf_size, PAGE_SIZE);
+        unsigned long cow_ext_buf_size = ALIGN(moocbt_cow_ext_buf_size, PAGE_SIZE);
 
         int (*fiemap)(struct inode *, struct fiemap_extent_info *, u64 start, u64 len);
 
@@ -1117,19 +1118,19 @@ int cow_get_file_extents(struct snap_device* dev, struct file* filp)
         LOG_DEBUG("getting cow file extents from filp=%p", filp);
 	LOG_DEBUG("attempting page stealing from %s", get_task_comm(parent_process_name, task));
 
-        dattobd_mm_lock(task->mm);
-        start_addr = dattobd_get_unmapped_area(NULL, 0, cow_ext_buf_size, 0, VM_READ | VM_WRITE);
+        moocbt_mm_lock(task->mm);
+        start_addr = moocbt_get_unmapped_area(NULL, 0, cow_ext_buf_size, 0, VM_READ | VM_WRITE);
 
         if (IS_ERR_VALUE(start_addr))
 		return start_addr; // returns -EPERM if failed
 
 
-        vma = dattobd_vm_area_allocate(task->mm);
+        vma = moocbt_vm_area_allocate(task->mm);
 
 	if (!vma) {
 		ret = -ENOMEM;
 		LOG_ERROR(ret, "vm_area_alloc() failed");
-		dattobd_mm_unlock(task->mm);
+		moocbt_mm_unlock(task->mm);
 		return ret;
 	}
 
@@ -1142,16 +1143,16 @@ int cow_get_file_extents(struct snap_device* dev, struct file* filp)
         ret = insert_vm_struct(task->mm, vma);
         if (ret < 0) {
 		LOG_ERROR(ret, "insert_vm_struct() failed");
-		dattobd_vm_area_free(vma);
-		dattobd_mm_unlock(task->mm);
+		moocbt_vm_area_free(vma);
+		moocbt_mm_unlock(task->mm);
 		return ret;
 	}
 
         pg = alloc_pages(GFP_USER, get_order(cow_ext_buf_size));
 	if (!pg) {
 		LOG_ERROR(ret, "alloc_page() failed");
-		dattobd_vm_area_free(vma);
-		dattobd_mm_unlock(task->mm);
+		moocbt_vm_area_free(vma);
+		moocbt_mm_unlock(task->mm);
 		return ret;
 	}
 
@@ -1161,8 +1162,8 @@ int cow_get_file_extents(struct snap_device* dev, struct file* filp)
 		LOG_ERROR(ret, "remap_pfn_range() failed");
 		ClearPageReserved(pg);
 		__free_pages(pg, get_order(cow_ext_buf_size));
-		dattobd_vm_area_free(vma);
-		dattobd_mm_unlock(task->mm);
+		moocbt_vm_area_free(vma);
+		moocbt_mm_unlock(task->mm);
 		return ret;
 	}
 
@@ -1211,7 +1212,7 @@ int cow_get_file_extents(struct snap_device* dev, struct file* filp)
 
 out:
 	ClearPageReserved(pg);
-	dattobd_mm_unlock(task->mm);
+	moocbt_mm_unlock(task->mm);
 	vm_munmap(vma->vm_start, cow_ext_buf_size);
 	__free_pages(pg, get_order(cow_ext_buf_size));
 	return ret;

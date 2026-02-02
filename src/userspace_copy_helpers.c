@@ -2,9 +2,10 @@
 
 /*
  * Copyright (C) 2022 Datto Inc.
+ * Additional contributions by Slide are Copyright (C) 2026 Project Orca Inc.
  */
 
-#include "dattobd.h"
+#include "moocbt.h"
 #include "includes.h"
 #include "logging.h"
 #include "userspace_copy_helpers.h"
@@ -292,8 +293,8 @@ int user_path_at(int dfd, const char __user *name, unsigned flags,
                 err = path_lookup(tmp, flags, &nd);
                 putname(tmp);
                 if (!err) {
-                        path->dentry = dattobd_get_nd_dentry(nd);
-                        path->mnt = dattobd_get_nd_mnt(nd);
+                        path->dentry = moocbt_get_nd_dentry(nd);
+                        path->mnt = moocbt_get_nd_mnt(nd);
                 }
         }
         return err;

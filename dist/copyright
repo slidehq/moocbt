@@ -1,10 +1,12 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: dattobd
-Upstream-Contact: Tom Caputi <tcaputi@datto.com>
-Source: https://github.com/datto/dattobd
+Upstream-Name: moocbt
+Upstream-Contact: Slide <it@slide.tech>
+Source: https://github.com/slidehq/moocbt
 
 Files: *
-Copyright: Copyright 2015-2022 Datto, Inc.
+Copyright:
+ Copyright 2015-2022 Datto, Inc.
+ Additional contributions by Slide are Copyright (C) 2026 Project Orca Inc
 License: GPL-2.0
  This program is free software; you can redistribute it
  and/or modify it under the terms of the GNU General Public
@@ -27,7 +29,9 @@ License: GPL-2.0
  `/usr/share/common-licenses/GPL-2'.
 
 Files: lib/*
-Copyright: Copyright 2015-2022 Datto, Inc.
+Copyright:
+ Copyright 2015-2022 Datto, Inc.
+ Additional contributions by Slide are Copyright (C) 2026 Project Orca Inc
 License: LGPL-2.1+
  This program is free software; you can redistribute it
  and/or modify it under the terms of the GNU General Public
@@ -49,8 +53,10 @@ License: LGPL-2.1+
  Public License version 2.1 can be found in the file
  `/usr/share/common-licenses/LGPL-2.1'.
 
-Files: src/dattobd.h
-Copyright: Copyright 2015-2022 Datto, Inc.
+Files: src/moocbt.h
+Copyright:
+ Copyright 2015-2022 Datto, Inc.
+ Additional contributions by Slide are Copyright (C) 2026 Project Orca Inc
 License: LGPL-2.1+
  This program is free software; you can redistribute it
  and/or modify it under the terms of the GNU General Public

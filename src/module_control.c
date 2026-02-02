@@ -2,11 +2,12 @@
 
 /*
  * Copyright (C) 2022 Datto Inc.
+ * Additional contributions by Slide are Copyright (C) 2026 Project Orca Inc.
  */
 
 #include "module_control.h"
 
-#include "dattobd.h"
+#include "moocbt.h"
 #include "includes.h"
 #include "callback_refs.h"
 #include "ioctl_handlers.h"
@@ -24,10 +25,10 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Tom Caputi");
 MODULE_DESCRIPTION("Kernel module for supporting block device snapshots and "
                    "incremental backups.");
-MODULE_VERSION(DATTOBD_VERSION);
+MODULE_VERSION(MOOCBT_VERSION);
 
-#define DATTOBD_DEFAULT_SNAP_DEVICES 24
-#define DATTOBD_MAX_SNAP_DEVICES 255
+#define MOOCBT_DEFAULT_SNAP_DEVICES 24
+#define MOOCBT_MAX_SNAP_DEVICES 255
 
 unsigned int highest_minor;
 unsigned int lowest_minor;
@@ -36,32 +37,32 @@ int major;
 /*
  * Global module parameters
  */
-int dattobd_may_hook_syscalls = 1;
-unsigned long dattobd_cow_max_memory_default = (300 * 1024 * 1024);
-unsigned int dattobd_cow_fallocate_percentage_default = 10;
-unsigned int dattobd_max_snap_devices = DATTOBD_DEFAULT_SNAP_DEVICES;
-int dattobd_debug = 0;
+int moocbt_may_hook_syscalls = 1;
+unsigned long moocbt_cow_max_memory_default = (300 * 1024 * 1024);
+unsigned int moocbt_cow_fallocate_percentage_default = 10;
+unsigned int moocbt_max_snap_devices = MOOCBT_DEFAULT_SNAP_DEVICES;
+int moocbt_debug = 0;
 
-module_param_named(may_hook_syscalls, dattobd_may_hook_syscalls, int, S_IRUGO);
+module_param_named(may_hook_syscalls, moocbt_may_hook_syscalls, int, S_IRUGO);
 MODULE_PARM_DESC(may_hook_syscalls,
                  "if true, allows the kernel module to find and alter the "
                  "system call table to allow tracing to work across remounts");
 
-module_param_named(cow_max_memory_default, dattobd_cow_max_memory_default,
+module_param_named(cow_max_memory_default, moocbt_cow_max_memory_default,
                    ulong, 0);
 MODULE_PARM_DESC(cow_max_memory_default,
                  "default maximum cache size (in bytes)");
 
 module_param_named(cow_fallocate_percentage_default,
-                   dattobd_cow_fallocate_percentage_default, uint, 0);
+                   moocbt_cow_fallocate_percentage_default, uint, 0);
 MODULE_PARM_DESC(
         cow_fallocate_percentage_default,
         "default space allocated to the cow file (as integer percentage)");
 
-module_param_named(max_snap_devices, dattobd_max_snap_devices, uint, S_IRUGO);
+module_param_named(max_snap_devices, moocbt_max_snap_devices, uint, S_IRUGO);
 MODULE_PARM_DESC(max_snap_devices, "maximum number of tracers available");
 
-module_param_named(debug, dattobd_debug, int, S_IRUGO | S_IWUSR);
+module_param_named(debug, moocbt_debug, int, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "enables debug logging");
 
 static struct proc_dir_entry *info_proc;
@@ -84,7 +85,7 @@ static struct miscdevice snap_control_device = {
 //#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,25)
 
 /**
- * proc_create() - Creates the datto info file in /proc.
+ * proc_create() - Creates the moocbt info file in /proc.
  * @name: The name of the /proc file.
  * @mode: The mode of the /proc file.
  * @parent: The parent directory, NULL for default.
@@ -133,7 +134,7 @@ static void unregister_sequential_file_in_proc(void)
 }
 
 /**
- * unregister_blkdev_from_kernel() - The dattobd device driver will be
+ * unregister_blkdev_from_kernel() - The moocbt device driver will be
  * unregistered with the kernel
  */
 static void unregister_blkdev_from_kernel(void)
@@ -143,7 +144,7 @@ static void unregister_blkdev_from_kernel(void)
 }
 
 /**
- * agent_exit() - The function used to destroy the dattobd module.
+ * agent_exit() - The function used to destroy the moocbt module.
  */
 static void agent_exit(void)
 {
@@ -171,24 +172,24 @@ module_exit(agent_exit);
 static void calc_max_snap_devices_and_init_minor_range(void)
 {
         // init minor range
-        if (dattobd_max_snap_devices == 0 ||
-            dattobd_max_snap_devices > DATTOBD_MAX_SNAP_DEVICES) {
+        if (moocbt_max_snap_devices == 0 ||
+            moocbt_max_snap_devices > MOOCBT_MAX_SNAP_DEVICES) {
                 const unsigned int nr_devices =
-                        dattobd_max_snap_devices == 0 ?
-                                DATTOBD_DEFAULT_SNAP_DEVICES :
-                                DATTOBD_MAX_SNAP_DEVICES;
+                        moocbt_max_snap_devices == 0 ?
+                                MOOCBT_DEFAULT_SNAP_DEVICES :
+                                MOOCBT_MAX_SNAP_DEVICES;
                 LOG_WARN(
                         "invalid number of snapshot devices (%u), setting to %u",
-                        dattobd_max_snap_devices, nr_devices);
-                dattobd_max_snap_devices = nr_devices;
+                        moocbt_max_snap_devices, nr_devices);
+                moocbt_max_snap_devices = nr_devices;
         }
 
         highest_minor = 0;
-        lowest_minor = dattobd_max_snap_devices - 1;
+        lowest_minor = moocbt_max_snap_devices - 1;
 }
 
 /**
- * register_blkdev_and_get_major_number() - The dattobd device driver will be
+ * register_blkdev_and_get_major_number() - The moocbt device driver will be
  * registered with the kernel and ready for business after this call.
  *
  * Return:
@@ -247,7 +248,7 @@ static int register_ioctl_control_interface(void)
 }
 
 /**
- * agent_init() - The function to setup the dattobd module.
+ * agent_init() - The function to setup the moocbt module.
  *
  * Return:
  * * 0  - The module was successfully initialized.

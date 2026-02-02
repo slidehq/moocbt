@@ -3,6 +3,7 @@
 
 #
 # Copyright (C) 2019 Datto, Inc.
+# Additional contributions by Slide are Copyright (C) 2026 Project Orca Inc.
 #
 
 import hashlib

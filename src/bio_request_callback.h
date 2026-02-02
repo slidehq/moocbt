@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 // Copyright (C) 2022 Datto Inc.
+ * Additional contributions by Slide are Copyright (C) 2026 Project Orca Inc.
 
 /**
  *
@@ -33,12 +34,12 @@
 #endif
 
 #define BIO_REQUEST_CALLBACK_FN submit_bio_fn
-#define SUBMIT_BIO_REAL dattobd_call_mrf_real
+#define SUBMIT_BIO_REAL moocbt_call_mrf_real
 #else
 #define BIO_REQUEST_CALLBACK_FN make_request_fn
-#define SUBMIT_BIO_REAL dattobd_call_mrf_real
-#define GET_BIO_REQUEST_TRACKING_PTR dattobd_get_bd_mrf
-#define GET_BIO_REQUEST_TRACKING_PTR_GD dattobd_get_gd_mrf
+#define SUBMIT_BIO_REAL moocbt_call_mrf_real
+#define GET_BIO_REQUEST_TRACKING_PTR moocbt_get_bd_mrf
+#define GET_BIO_REQUEST_TRACKING_PTR_GD moocbt_get_gd_mrf
 #endif
 
 #endif

@@ -1,16 +1,16 @@
 # SPDX-License-Identifier: GPL-2.0-only
 
-BINARY_NAME = dbdctl
+BINARY_NAME = moo
 INSTALLDIR = $(PREFIX)/bin
-SOURCES = dbdctl.c
+SOURCES = moo.c
 
 .PHONY: shared static install-static install uninstall clean
 
 shared:
-	$(CC) $(CCFLAGS) -o $(BINARY_NAME) -L $(BASE_DIR)/lib $(SOURCES) -ldattobd
+	$(CC) $(CCFLAGS) -o $(BINARY_NAME) -L $(BASE_DIR)/lib $(SOURCES) -lmoocbt
 
 static:
-	$(CC) $(CCFLAGS) -o $(BINARY_NAME) $(SOURCES) $(BASE_DIR)/lib/libdattobd.a
+	$(CC) $(CCFLAGS) -o $(BINARY_NAME) $(SOURCES) $(BASE_DIR)/lib/libmoocbt.a
 
 install-static: static
 	mkdir -p $(INSTALLDIR)

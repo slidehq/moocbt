@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-LIBNAME = libdattobd.so
+LIBNAME = libmoocbt.so
 SOVER = 1
 SHARED_CCFLAGS = -fPIC -lc -shared -Wl,-soname,$(LIBNAME).$(SOVER)
 LIBDIR = $(PREFIX)/lib64
 
-SOURCES = libdattobd.c
+SOURCES = libmoocbt.c
 
 .PHONY: all shared static install uninstall clean
 
@@ -17,7 +17,7 @@ shared:
 
 static:
 	$(CC) $(CCFLAGS) -c $(SOURCES)
-	ar rcs libdattobd.a libdattobd.o
+	ar rcs libmoocbt.a libmoocbt.o
 
 install: shared
 	install $(LIBNAME).$(SOVER) $(LIBDIR)

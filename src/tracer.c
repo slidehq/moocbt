@@ -2,6 +2,7 @@
 
 /*
  * Copyright (C) 2023 Datto Inc.
+ * Additional contributions by Slide are Copyright (C) 2026 Project Orca Inc.
  */
 
 #include "tracer.h"
@@ -33,7 +34,7 @@
 
 // Helpers to get/set either the make_request_fn or the submit_bio function
 // pointers in a block device.
-static inline BIO_REQUEST_CALLBACK_FN *dattobd_get_bd_fn(
+static inline BIO_REQUEST_CALLBACK_FN *moocbt_get_bd_fn(
     struct block_device *bdev)
 {
 #ifdef USE_BDOPS_SUBMIT_BIO
@@ -64,13 +65,13 @@ static inline BIO_REQUEST_CALLBACK_FN *dattobd_get_bd_fn(
         __tracer_setup_cow_thread(dev, minor, 1)
 
 #ifdef HAVE_BIOSET_NEED_BVECS_FLAG
-#define dattobd_bioset_create(bio_size, bvec_size, scale) \
+#define moocbt_bioset_create(bio_size, bvec_size, scale) \
         bioset_create(bio_size, bvec_size, BIOSET_NEED_BVECS)
 #elif defined HAVE_BIOSET_CREATE_3
-#define dattobd_bioset_create(bio_size, bvec_size, scale) \
+#define moocbt_bioset_create(bio_size, bvec_size, scale) \
         bioset_create(bio_size, bvec_size, scale)
 #else
-#define dattobd_bioset_create(bio_size, bvec_size, scale) \
+#define moocbt_bioset_create(bio_size, bvec_size, scale) \
         bioset_create(bio_size, scale)
 #endif
 
@@ -90,7 +91,7 @@ static inline BIO_REQUEST_CALLBACK_FN *dattobd_get_bd_fn(
 #define SECTORS_PER_PAGE (PAGE_SIZE / SECTOR_SIZE)
 #define BLOCK_TO_SECTOR(block) ((block)*SECTORS_PER_BLOCK)
 
-void dattobd_free_request_tracking_ptr(struct snap_device *dev)
+void moocbt_free_request_tracking_ptr(struct snap_device *dev)
 {
 #ifdef USE_BDOPS_SUBMIT_BIO
         if(dev->sd_tracing_ops){
@@ -180,10 +181,10 @@ static int snap_trace_bio(struct snap_device *dev, struct bio *bio)
         if(dev->sd_orig_request_fn){
                 SUBMIT_BIO_REAL(dev,new_bio);
         }else{
-                dattobd_submit_bio(new_bio);
+                moocbt_submit_bio(new_bio);
         }
 #else
-                dattobd_submit_bio(new_bio);
+                moocbt_submit_bio(new_bio);
 #endif
 
                 // if our bio didn't cover the entire clone we must keep creating bios
@@ -346,19 +347,19 @@ static int bdev_is_already_traced(const struct block_device *bdev, snap_device_a
 }
 
 /**
- * file_is_on_bdev() - Checks to see if the &struct dattobd mutable file object is contained
+ * file_is_on_bdev() - Checks to see if the &struct moocbt mutable file object is contained
  * within the &struct block_device device.
  *
- * @dfilp: A dattobd mutable file object.
+ * @dfilp: A moocbt mutable file object.
  * @bdev: the &struct block_device that might hold the @dfilp.
  *
  * Return:
  * * 0 - the @dfilp is not on the @bdev.
  * * !0 - the @dfilp is on the @bdev.
  */
-static int file_is_on_bdev(const struct dattobd_mutable_file *dfilp, struct block_device *bdev)
+static int file_is_on_bdev(const struct moocbt_mutable_file *dfilp, struct block_device *bdev)
 {
-        struct super_block *sb = dattobd_get_super(bdev);
+        struct super_block *sb = moocbt_get_super(bdev);
         struct super_block *sb_file = dfilp->mnt->mnt_sb;
         int ret = 0;
 
@@ -366,7 +367,7 @@ static int file_is_on_bdev(const struct dattobd_mutable_file *dfilp, struct bloc
                 LOG_DEBUG("file_is_on_bdev() if(sb)");
                 LOG_DEBUG("sb name:%s, file->sb name:%s", sb->s_root->d_name.name, sb_file->s_root->d_name.name);
                 ret = (dfilp->mnt->mnt_sb == sb);
-                dattobd_drop_super(sb);
+                moocbt_drop_super(sb);
         }
         return ret;
 }
@@ -379,7 +380,7 @@ static int file_is_on_bdev(const struct dattobd_mutable_file *dfilp, struct bloc
  */
 static void minor_range_recalculate(snap_device_array snap_devices)
 {
-        unsigned int i, highest = 0, lowest = dattobd_max_snap_devices - 1;
+        unsigned int i, highest = 0, lowest = moocbt_max_snap_devices - 1;
         struct snap_device *dev;
 
         tracer_for_each_full(dev, i)
@@ -566,7 +567,7 @@ static int __tracer_setup_cow(struct snap_device *dev,
                         goto error;
         } else {
                 if (!cache_size)
-                        dev->sd_cache_size = dattobd_cow_max_memory_default;
+                        dev->sd_cache_size = moocbt_cow_max_memory_default;
                 else
                         dev->sd_cache_size = cache_size;
 
@@ -576,7 +577,7 @@ static int __tracer_setup_cow(struct snap_device *dev,
                         if (!fallocated_space) {
                                 max_file_size =
                                         size * SECTOR_SIZE *
-                                        dattobd_cow_fallocate_percentage_default;
+                                        moocbt_cow_fallocate_percentage_default;
                                 do_div(max_file_size, 100);
                                 dev->sd_falloc_size = max_file_size;
                                 do_div(dev->sd_falloc_size, (1024 * 1024));
@@ -650,7 +651,7 @@ static void __tracer_destroy_base_dev(struct snap_device *dev)
 
         if (dev->sd_base_dev) {
                 LOG_DEBUG("freeing base block device");
-                dattobd_blkdev_put(dev->sd_base_dev);
+                moocbt_blkdev_put(dev->sd_base_dev);
                 dev->sd_base_dev = NULL;
         }
 }
@@ -673,7 +674,7 @@ static int __tracer_setup_base_dev(struct snap_device *dev,
 
         // open the base block device
         LOG_DEBUG("ENTER __tracer_setup_base_dev");
-        dev->sd_base_dev = dattobd_blkdev_by_path(bdev_path, FMODE_READ, NULL);
+        dev->sd_base_dev = moocbt_blkdev_by_path(bdev_path, FMODE_READ, NULL);
         if (IS_ERR(dev->sd_base_dev)) {
                 ret = PTR_ERR(dev->sd_base_dev);
                 dev->sd_base_dev = NULL;
@@ -703,7 +704,7 @@ static int __tracer_setup_base_dev(struct snap_device *dev,
         LOG_DEBUG("calculating block device size and offset");
         if (bdev_whole(dev->sd_base_dev->bdev) != dev->sd_base_dev->bdev) {
                 dev->sd_sect_off = get_start_sect(dev->sd_base_dev->bdev);
-                dev->sd_size = dattobd_bdev_size(dev->sd_base_dev->bdev);
+                dev->sd_size = moocbt_bdev_size(dev->sd_base_dev->bdev);
         } else {
                 dev->sd_sect_off = 0;
                 dev->sd_size = get_capacity(dev->sd_base_dev->bdev->bd_disk);
@@ -828,14 +829,14 @@ static void __tracer_destroy_cow_path(struct snap_device *dev)
  * __tracer_setup_cow_path() - Sets up the COW file path given a &struct file.
  *
  * @dev: The &struct snap_device object pointer.
- * @cow_dfile: A &struct dattobd_mutable_file object pointer.
+ * @cow_dfile: A &struct moocbt_mutable_file object pointer.
  *
  * Return:
  * * 0 - success
  * * !0 - errno indicating the error
  */
 static int __tracer_setup_cow_path(struct snap_device *dev,
-                                   const struct dattobd_mutable_file *cow_dfile)
+                                   const struct moocbt_mutable_file *cow_dfile)
 {
         int ret;
 
@@ -944,7 +945,7 @@ static int __tracer_bioset_init(struct snap_device *dev)
 {
 #ifndef HAVE_BIOSET_INIT
         //#if LINUX_VERSION_CODE < KERNEL_VERSION(4,18,0)
-        dev->sd_bioset = dattobd_bioset_create(BIO_SET_SIZE, BIO_SET_SIZE, 0);
+        dev->sd_bioset = moocbt_bioset_create(BIO_SET_SIZE, BIO_SET_SIZE, 0);
         if (!dev->sd_bioset)
                 return -ENOMEM;
         return 0;
@@ -1036,7 +1037,7 @@ static int __tracer_setup_snap(struct snap_device *dev, unsigned int minor,
         // give our request queue the same properties as the base device's
         LOG_DEBUG("setting queue limits");
         blk_set_stacking_limits(&dev->sd_queue->limits);
-        dattobd_bdev_stack_limits(dev->sd_queue, bdev, 0);
+        moocbt_bdev_stack_limits(dev->sd_queue, bdev, 0);
 
 #ifdef HAVE_MERGE_BVEC_FN
         // use a thin wrapper around the base device's merge_bvec_fn
@@ -1165,14 +1166,14 @@ error:
 
 static int __try_freeze_bdev(struct block_device* bdev, struct super_block** sb){
         int ret;
-        struct super_block *origsb = dattobd_get_super(bdev);
+        struct super_block *origsb = moocbt_get_super(bdev);
         
 #ifdef HAVE_BDEVNAME  
         char bdev_name[BDEVNAME_SIZE];      
         bdevname(bdev, bdev_name);
 #endif     
         if(origsb){
-                dattobd_drop_super(origsb);
+                moocbt_drop_super(origsb);
 
                 // freeze and sync block device
 #ifdef HAVE_BDEVNAME                
@@ -1407,9 +1408,9 @@ static MRF_RETURN_TYPE tracing_fn(struct request_queue *q, struct bio *bio)
                 // If we get here, then we know this is a device we're managing
                 // and the current bio belongs to said device.
                 orig_fn=dev->sd_orig_request_fn;
-                if (dattobd_bio_op_flagged(bio, DATTOBD_PASSTHROUGH))
+                if (moocbt_bio_op_flagged(bio, MOOCBT_PASSTHROUGH))
                 {
-                        dattobd_bio_op_clear_flag(bio, DATTOBD_PASSTHROUGH);
+                        moocbt_bio_op_clear_flag(bio, MOOCBT_PASSTHROUGH);
                 }
                 else
                 {
@@ -1436,11 +1437,11 @@ static MRF_RETURN_TYPE tracing_fn(struct request_queue *q, struct bio *bio)
         if(orig_fn){
                 orig_fn(bio);
         }
-        else if(dattobd_bio_bi_disk(bio)->fops->submit_bio){
-                if(dattobd_bio_bi_disk(bio)->fops->submit_bio == tracing_fn){
-                        dattobd_snap_null_mrf(bio); 
+        else if(moocbt_bio_bi_disk(bio)->fops->submit_bio){
+                if(moocbt_bio_bi_disk(bio)->fops->submit_bio == tracing_fn){
+                        moocbt_snap_null_mrf(bio); 
                 }else{
-                        dattobd_bio_bi_disk(bio)->fops->submit_bio(bio);
+                        moocbt_bio_bi_disk(bio)->fops->submit_bio(bio);
                 }
         }
         else{
@@ -1463,7 +1464,7 @@ out:
 #ifndef USE_BDOPS_SUBMIT_BIO
 
 /**
- * dattobd_find_orig_mrf() - Locates the original MRF function associated with
+ * moocbt_find_orig_mrf() - Locates the original MRF function associated with
  *                   the @bdev block device.  All tracked block devices
  *                   are checked until a match is found.
  *
@@ -1475,20 +1476,20 @@ out:
  * * 0 - success
  * * !0 - errno indicating the error
  */
-static int dattobd_find_orig_mrf(struct block_device *bdev,
+static int moocbt_find_orig_mrf(struct block_device *bdev,
                                  make_request_fn **mrf, snap_device_array snap_devices){
         int i;
         struct snap_device *dev;
         struct request_queue *q = bdev_get_queue(bdev);
-        make_request_fn *orig_mrf = dattobd_get_bd_mrf(bdev);
+        make_request_fn *orig_mrf = moocbt_get_bd_mrf(bdev);
 
         if(orig_mrf != tracing_fn){
 #ifdef HAVE_BLK_MQ_MAKE_REQUEST
                 // Linux version 5.8
                 if (!orig_mrf){
-                        orig_mrf = dattobd_null_mrf;
+                        orig_mrf = moocbt_null_mrf;
                         LOG_DEBUG(
-                            "original mrf is empty, set to dattobd_null_mrf");
+                            "original mrf is empty, set to moocbt_null_mrf");
                 }
 #endif
             *mrf = orig_mrf;
@@ -1510,16 +1511,16 @@ static int dattobd_find_orig_mrf(struct block_device *bdev,
 static int find_orig_bdops(struct block_device *bdev, struct block_device_operations **ops, make_request_fn **mrf, struct tracing_ops** trops, snap_device_array snap_devices){
         int i;
 	struct snap_device *dev;
-	struct block_device_operations *orig_ops = dattobd_get_bd_ops(bdev);
+	struct block_device_operations *orig_ops = moocbt_get_bd_ops(bdev);
 	make_request_fn *orig_mrf = orig_ops->submit_bio;
         LOG_DEBUG("ENTER find_orig_bdops");
         *trops=NULL;
 
         if(orig_mrf != tracing_fn){
                 if(!orig_mrf){
-                        LOG_DEBUG("original mrf is empty, setting it to dattobd_snap_null_mrf");
+                        LOG_DEBUG("original mrf is empty, setting it to moocbt_snap_null_mrf");
                         //in the future change this to mq interface
-                        orig_mrf=dattobd_snap_null_mrf;
+                        orig_mrf=moocbt_snap_null_mrf;
                 }else{
                         LOG_DEBUG("original mrf is not empt orig_mrf= %p, orig ops=%p", orig_mrf, orig_ops);
                 }
@@ -1534,7 +1535,7 @@ static int find_orig_bdops(struct block_device *bdev, struct block_device_operat
 
         tracer_for_each(dev, i){
 		if(!dev || test_bit(UNVERIFIED, &dev->sd_state)) continue;
-		if(orig_ops == dattobd_get_bd_ops(dev->sd_base_dev->bdev)){
+		if(orig_ops == moocbt_get_bd_ops(dev->sd_base_dev->bdev)){
 			*ops = dev->bd_ops;
 			*mrf = dev->sd_orig_request_fn;
                         *trops=tracing_ops_get(dev->sd_tracing_ops);
@@ -1565,7 +1566,7 @@ int tracer_alloc_ops(struct snap_device* dev){
                 LOG_ERROR(-ENOMEM, "error while alocating new block_device_operations");
                 return -ENOMEM;
         }
-        memcpy(trops->bd_ops, dattobd_get_bd_ops(dev->sd_base_dev->bdev),sizeof(struct block_device_operations));
+        memcpy(trops->bd_ops, moocbt_get_bd_ops(dev->sd_base_dev->bdev),sizeof(struct block_device_operations));
         trops->bd_ops->submit_bio = tracing_fn;
 #ifdef HAVE_BD_HAS_SUBMIT_BIO
         trops->has_submit_bio=dev->sd_base_dev->bdev->bd_has_submit_bio;
@@ -1603,7 +1604,7 @@ static int __tracer_should_reset_mrf(const struct snap_device* dev, snap_device_
         if (GET_BIO_REQUEST_TRACKING_PTR(dev->sd_base_dev->bdev) != tracing_fn) 
                 return 0;
 #else
-        ops = dattobd_get_bd_ops(dev->sd_base_dev->bdev);
+        ops = moocbt_get_bd_ops(dev->sd_base_dev->bdev);
 #endif
 
     //return 0 if there is another device tracing the same queue as dev.
@@ -1613,7 +1614,7 @@ static int __tracer_should_reset_mrf(const struct snap_device* dev, snap_device_
 #ifndef USE_BDOPS_SUBMIT_BIO
                         if (q == bdev_get_queue(cur_dev->sd_base_dev->bdev)) return 0;
 #else
-                        if(ops==dattobd_get_bd_ops(cur_dev->sd_base_dev->bdev)) return 0;
+                        if(ops==moocbt_get_bd_ops(cur_dev->sd_base_dev->bdev)) return 0;
 #endif
                 }
         }
@@ -1683,7 +1684,7 @@ static void __tracer_destroy_tracing(struct snap_device *dev, snap_device_array_
                 );
         }
         smp_wmb();
-        dattobd_free_request_tracking_ptr(dev);
+        moocbt_free_request_tracking_ptr(dev);
 
         }
         else if(snap_devices[dev->sd_minor] == dev)
@@ -1741,7 +1742,7 @@ static int __tracer_setup_tracing(struct snap_device *dev, unsigned int minor, s
         LOG_DEBUG("getting the base block device's make_request_fn");
 
 #ifndef USE_BDOPS_SUBMIT_BIO
-        ret = dattobd_find_orig_mrf(dev->sd_base_dev->bdev, &dev->sd_orig_request_fn, snap_devices);
+        ret = moocbt_find_orig_mrf(dev->sd_base_dev->bdev, &dev->sd_orig_request_fn, snap_devices);
         if (ret)
                 goto error;
         ret = __tracer_transition_tracing(
@@ -2150,27 +2151,27 @@ void tracer_reconfigure(struct snap_device *dev, unsigned long cache_size)
 {
         dev->sd_cache_size = cache_size;
         if (!cache_size)
-                cache_size = dattobd_cow_max_memory_default;
+                cache_size = moocbt_cow_max_memory_default;
         if (test_bit(ACTIVE, &dev->sd_state))
                 cow_modify_cache_size(dev->sd_cow, cache_size);
 }
 
 /**
- * tracer_dattobd_info() - Copies relevant, current information in @dev to
+ * tracer_moocbt_info() - Copies relevant, current information in @dev to
  *                         @info.
  *
  * @dev: The source &struct snap_device tracking block device state.
- * @info: A destination &struct dattobd_info object pointer.
+ * @info: A destination &struct moocbt_info object pointer.
  */
-void tracer_dattobd_info(const struct snap_device *dev,
-                         struct dattobd_info *info)
+void tracer_moocbt_info(const struct snap_device *dev,
+                         struct moocbt_info *info)
 {
         info->minor = dev->sd_minor;
         info->state = dev->sd_state;
         info->error = tracer_read_fail_state(dev);
         info->cache_size = (dev->sd_cache_size) ?
                                    dev->sd_cache_size :
-                                   dattobd_cow_max_memory_default;
+                                   moocbt_cow_max_memory_default;
 #ifdef HAVE_STRSCPY
         strscpy(info->cow, dev->sd_cow_path, PATH_MAX);
         strscpy(info->bdev, dev->sd_bdev_path, PATH_MAX);

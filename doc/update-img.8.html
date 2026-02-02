@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta http-equiv='content-type' value='text/html;charset=utf8'>
-  <meta name='generator' value='Ronn/v0.7.3 (http://github.com/rtomayko/ronn/tree/0.7.3)'>
+  <meta http-equiv='content-type' content='text/html;charset=utf8'>
+  <meta name='generator' content='Ronn-NG/v0.9.1 (http://github.com/apjanke/ronn-ng/tree/0.9.1)'>
   <title>update-img(8)</title>
   <style type='text/css' media='all'>
   /* style: man */
@@ -57,8 +57,9 @@
     <a href="#NAME">NAME</a>
     <a href="#SYNOPSIS">SYNOPSIS</a>
     <a href="#DESCRIPTION">DESCRIPTION</a>
-    <a href="#Bugs">Bugs</a>
-    <a href="#Author">Author</a>
+    <a href="#BUGS">BUGS</a>
+    <a href="#AUTHORS">AUTHORS</a>
+    <a href="#COPYRIGHT">COPYRIGHT</a>
   </div>
 
   <ol class='man-decor man-head man head'>
@@ -67,41 +68,46 @@
     <li class='tr'>update-img(8)</li>
   </ol>
 
-  <h2 id="NAME">NAME</h2>
+  
+<h2 id="NAME">NAME</h2>
 <p class="man-name">
   <code>update-img</code>
 </p>
 <h2 id="NAME">NAME</h2>
 
-<p>update-img - Update a backup image with dattobd COW file.</p>
+<p>update-img - Update a backup image with moocbt COW file.</p>
 
 <h2 id="SYNOPSIS">SYNOPSIS</h2>
 
-<p><code>update-img &lt;snapshot device> &lt;cow file> &lt;image file></code></p>
+<p><code>update-img &lt;snapshot device&gt; &lt;cow file&gt; &lt;image file&gt;</code></p>
 
 <h2 id="DESCRIPTION">DESCRIPTION</h2>
 
-<p><code>update-img</code> is a simple tool to efficiently update backup images made by the dattobd kernel module. It uses the leftover COW file from dattobd's incremental state to efficiently update an existing backup image. See the man page on <code>dbdctl</code> for an example use case.</p>
+<p><code>update-img</code> is a simple tool to efficiently update backup images made by the moocbt kernel module. It uses the leftover COW file from moocbt's incremental state to efficiently update an existing backup image. See the man page on <code>moo</code> for an example use case.</p>
 
 <h3 id="EXAMPLES">EXAMPLES</h3>
 
-<p><code># update-img /dev/datto4 /var/backup/datto1 /mnt/data/backup-img</code></p>
+<p><code># update-img /dev/moocbt4 /var/backup/moocow1 /mnt/data/backup-img</code></p>
 
-<p>This command will update a previously backed up snapshot <code>/mnt/data/backup-img</code> with the changed blocks indicated by <code>/var/backup/datto1</code> from <code>/dev/datto4</code>.</p>
+<p>This command will update a previously backed up snapshot <code>/mnt/data/backup-img</code> with the changed blocks indicated by <code>/var/backup/moocow1</code> from <code>/dev/moocbt4</code>.</p>
 
-<p>NOTE: <code>&lt;snapshot device></code> MUST be the NEXT snapshot after the one that <code>&lt;image file></code> was copied from.</p>
+<p>NOTE: <code>&lt;snapshot device&gt;</code> MUST be the NEXT snapshot after the one that <code>&lt;image file&gt;</code> was copied from.</p>
 
-<h2 id="Bugs">Bugs</h2>
+<h2 id="BUGS">BUGS</h2>
 
-<h2 id="Author">Author</h2>
+<h2 id="AUTHORS">AUTHORS</h2>
 
-<pre><code>Tom Caputi (tcaputi@datto.com)
-</code></pre>
+<p>Tom Caputi (tcaputi@datto.com)</p>
 
+<p>Slide (it@slide.tech)</p>
+
+<h2 id="COPYRIGHT">COPYRIGHT</h2>
+
+<p>Additional contributions by Slide are Copyright (C) 2026 Project Orca Inc</p>
 
   <ol class='man-decor man-foot man foot'>
-    <li class='tl'>Datto Inc</li>
-    <li class='tc'>March 2016</li>
+    <li class='tl'>Slide</li>
+    <li class='tc'>February 2026</li>
     <li class='tr'>update-img(8)</li>
   </ol>
 

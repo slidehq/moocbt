@@ -132,7 +132,7 @@ static int __handle_bdev_mount_writable(const char *dir_name,
                 if (test_bit(UNVERIFIED, &dev->sd_state)) {
                         // get the block device for the unverified tracer we are
                         // looking into
-                        cur_bdev = dattobd_blkdev_by_path(dev->sd_bdev_path,
+                        cur_bdev = moocbt_blkdev_by_path(dev->sd_bdev_path,
                                                       FMODE_READ, NULL);
                         if (IS_ERR(cur_bdev)) {
                                 cur_bdev = NULL;
@@ -146,14 +146,14 @@ static int __handle_bdev_mount_writable(const char *dir_name,
                                           "unverified device %d",
                                           i);
                                 auto_transition_active(i, dir_name, snap_devices);
-                                dattobd_blkdev_put(cur_bdev);
+                                moocbt_blkdev_put(cur_bdev);
 
                                 ret = 0;
                                 goto out;
                         }
 
                         // put the block device
-                        dattobd_blkdev_put(cur_bdev);
+                        moocbt_blkdev_put(cur_bdev);
 
                 } else if (dev->sd_base_dev && dev->sd_base_dev->bdev == bdev) {
                         LOG_DEBUG(
@@ -281,7 +281,7 @@ void post_umount_check(int dormant_ret, int umount_ret, unsigned int idx,
         // reactivate
         if (umount_ret) {
                 struct bdev_wrapper *bdev_w;
-                bdev_w = dattobd_blkdev_by_path(dev->sd_bdev_path, FMODE_READ, NULL);
+                bdev_w = moocbt_blkdev_by_path(dev->sd_bdev_path, FMODE_READ, NULL);
                 if (IS_ERR_OR_NULL(bdev_w)) {
                         LOG_DEBUG("device gone, moving to error state");
                         tracer_set_fail_state(dev, -ENODEV);
@@ -289,7 +289,7 @@ void post_umount_check(int dormant_ret, int umount_ret, unsigned int idx,
                         return;
                 }
 
-                dattobd_blkdev_put(bdev_w);
+                moocbt_blkdev_put(bdev_w);
 
                 LOG_DEBUG("umount call failed, reactivating tracer %u", idx);
                 auto_transition_active(idx, dir_name, snap_devices);
@@ -304,7 +304,7 @@ void post_umount_check(int dormant_ret, int umount_ret, unsigned int idx,
 
         // if we went dormant, but the block device is still mounted somewhere,
         // goto fail state
-        sb = dattobd_get_super(dev->sd_base_dev->bdev);
+        sb = moocbt_get_super(dev->sd_base_dev->bdev);
         if (sb) {
                 if (!(sb->s_flags & MS_RDONLY)) {
                         LOG_ERROR(
@@ -312,10 +312,10 @@ void post_umount_check(int dormant_ret, int umount_ret, unsigned int idx,
                                 "device still mounted after umounting cow file's "
                                 "file-system. entering error state");
                         tracer_set_fail_state(dev, -EIO);
-                        dattobd_drop_super(sb);
+                        moocbt_drop_super(sb);
                         return;
                 }
-                dattobd_drop_super(sb);
+                moocbt_drop_super(sb);
         }
 
         LOG_DEBUG("EXIT %s", __func__);

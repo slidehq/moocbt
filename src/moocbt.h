@@ -2,10 +2,11 @@
 
 /*
  * Copyright (C) 2015-2022 Datto Inc.
+ * Additional contributions by Slide are Copyright (C) 2026 Project Orca Inc.
  */
 
-#ifndef DATTOBD_H_
-#define DATTOBD_H_
+#ifndef MOOCBT_H_
+#define MOOCBT_H_
 
 #ifndef __KERNEL__
 #include <stdint.h>
@@ -15,8 +16,8 @@
 #include <linux/limits.h>
 #include <linux/types.h>
 
-#define DATTOBD_VERSION "0.12.1"
-#define DATTO_IOCTL_MAGIC 0x91
+#define MOOCBT_VERSION "0.12.1"
+#define MOOCBT_IOCTL_MAGIC 0x91
 
 struct setup_params {
         char *bdev; // name of block device to snapshot
@@ -87,7 +88,7 @@ struct cow_header {
                                     // snapshot
 };
 
-struct dattobd_info {
+struct moocbt_info {
         unsigned int minor;
         unsigned long state;
         int error;
@@ -102,26 +103,26 @@ struct dattobd_info {
 };
 
 #define IOCTL_SETUP_SNAP                                                       \
-        _IOW(DATTO_IOCTL_MAGIC, 1, struct setup_params) // in: see above
+        _IOW(MOOCBT_IOCTL_MAGIC, 1, struct setup_params) // in: see above
 #define IOCTL_RELOAD_SNAP                                                      \
-        _IOW(DATTO_IOCTL_MAGIC, 2, struct reload_params) // in: see above
+        _IOW(MOOCBT_IOCTL_MAGIC, 2, struct reload_params) // in: see above
 #define IOCTL_RELOAD_INC                                                       \
-        _IOW(DATTO_IOCTL_MAGIC, 3, struct reload_params) // in: see above
-#define IOCTL_DESTROY _IOW(DATTO_IOCTL_MAGIC, 4, unsigned int) // in: minor
+        _IOW(MOOCBT_IOCTL_MAGIC, 3, struct reload_params) // in: see above
+#define IOCTL_DESTROY _IOW(MOOCBT_IOCTL_MAGIC, 4, unsigned int) // in: minor
 #define IOCTL_TRANSITION_INC                                                   \
-        _IOW(DATTO_IOCTL_MAGIC, 5, unsigned int) // in: minor
+        _IOW(MOOCBT_IOCTL_MAGIC, 5, unsigned int) // in: minor
 #define IOCTL_TRANSITION_SNAP                                                  \
-        _IOW(DATTO_IOCTL_MAGIC, 6, struct transition_snap_params) // in: see
+        _IOW(MOOCBT_IOCTL_MAGIC, 6, struct transition_snap_params) // in: see
                                                                   // above
 #define IOCTL_RECONFIGURE                                                      \
-        _IOW(DATTO_IOCTL_MAGIC, 7, struct reconfigure_params) // in: see above
-#define IOCTL_DATTOBD_INFO                                                     \
-        _IOR(DATTO_IOCTL_MAGIC, 8, struct dattobd_info) // in: see above
-#define IOCTL_GET_FREE _IOR(DATTO_IOCTL_MAGIC, 9, int)
+        _IOW(MOOCBT_IOCTL_MAGIC, 7, struct reconfigure_params) // in: see above
+#define IOCTL_MOOCBT_INFO                                                     \
+        _IOR(MOOCBT_IOCTL_MAGIC, 8, struct moocbt_info) // in: see above
+#define IOCTL_GET_FREE _IOR(MOOCBT_IOCTL_MAGIC, 9, int)
 #define IOCTL_EXPAND_COW_FILE                                                  \
-        _IOW(DATTO_IOCTL_MAGIC, 10, struct expand_cow_file_params) // in: see above
+        _IOW(MOOCBT_IOCTL_MAGIC, 10, struct expand_cow_file_params) // in: see above
 #define IOCTL_RECONFIGURE_AUTO_EXPAND                                          \
-        _IOW(DATTO_IOCTL_MAGIC, 11, struct reconfigure_auto_expand_params) 
+        _IOW(MOOCBT_IOCTL_MAGIC, 11, struct reconfigure_auto_expand_params) 
                                                               // in: see above
 
-#endif /* DATTOBD_H_ */
+#endif /* MOOCBT_H_ */

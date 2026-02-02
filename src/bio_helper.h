@@ -2,6 +2,7 @@
 
 /*
  * Copyright (C) 2022 Datto Inc.
+ * Additional contributions by Slide are Copyright (C) 2026 Project Orca Inc.
  */
 
 #ifndef BIO_HELPER_H
@@ -76,11 +77,11 @@ struct bio_sector_map {
         struct bio_sector_map *next;
 };
 
-struct request_queue *dattobd_bio_get_queue(struct bio *bio);
+struct request_queue *moocbt_bio_get_queue(struct bio *bio);
 
-void dattobd_bio_set_dev(struct bio *bio, struct block_device *bdev);
+void moocbt_bio_set_dev(struct bio *bio, struct block_device *bdev);
 
-void dattobd_bio_copy_dev(struct bio *dst, struct bio *src);
+void moocbt_bio_copy_dev(struct bio *dst, struct bio *src);
 
 /* don't perform COW operation */
 #ifdef HAVE_ENUM_REQ_OP
@@ -93,13 +94,13 @@ void dattobd_bio_copy_dev(struct bio *dst, struct bio *src);
  * for bi_opf (that flag means something in struct request's cmd_flags, but
  * we're not setting that).
  */
-#define __DATTOBD_PASSTHROUGH 28 // set as the last flag bit
+#define __MOOCBT_PASSTHROUGH 28 // set as the last flag bit
 #else
 // set as an unused flag in versions older than 4.8
 // set as an unused opcode bit in kernels newer than 4.9
-#define __DATTOBD_PASSTHROUGH 30
+#define __MOOCBT_PASSTHROUGH 30
 #endif
-#define DATTOBD_PASSTHROUGH (1ULL << __DATTOBD_PASSTHROUGH)
+#define MOOCBT_PASSTHROUGH (1ULL << __MOOCBT_PASSTHROUGH)
 
 #ifndef HAVE_SUBMIT_BIO_1
 //#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,8,0)
@@ -120,19 +121,19 @@ typedef enum req_op {
 #endif
 typedef enum req_op req_op_t;
 
-extern void dattobd_set_bio_ops(struct bio *bio, req_op_t op,	
+extern void moocbt_set_bio_ops(struct bio *bio, req_op_t op,	
                                 unsigned op_flags);
 
 
 
 
 #define bio_is_discard(bio) ((bio)->bi_rw & REQ_DISCARD)
-#define dattobd_submit_bio(bio) submit_bio(0, bio)
-#define dattobd_submit_bio_wait(bio) submit_bio_wait(0, bio)
+#define moocbt_submit_bio(bio) submit_bio(0, bio)
+#define moocbt_submit_bio_wait(bio) submit_bio_wait(0, bio)
 
-int dattobd_bio_op_flagged(struct bio *bio, unsigned int flag);
-void dattobd_bio_op_set_flag(struct bio *bio, unsigned int flag);
-void dattobd_bio_op_clear_flag(struct bio *bio, unsigned int flag);
+int moocbt_bio_op_flagged(struct bio *bio, unsigned int flag);
+void moocbt_bio_op_set_flag(struct bio *bio, unsigned int flag);
+void moocbt_bio_op_clear_flag(struct bio *bio, unsigned int flag);
 
 #else
 
@@ -143,10 +144,10 @@ typedef enum req_op req_op_t;
 typedef enum req_opf req_op_t;
 #endif
 
-void dattobd_set_bio_ops(struct bio *bio, req_op_t op, unsigned op_flags);
-int dattobd_bio_op_flagged(struct bio *bio, unsigned int flag);
-void dattobd_bio_op_set_flag(struct bio *bio, unsigned int flag);
-void dattobd_bio_op_clear_flag(struct bio *bio, unsigned int flag);
+void moocbt_set_bio_ops(struct bio *bio, req_op_t op, unsigned op_flags);
+int moocbt_bio_op_flagged(struct bio *bio, unsigned int flag);
+void moocbt_bio_op_set_flag(struct bio *bio, unsigned int flag);
+void moocbt_bio_op_clear_flag(struct bio *bio, unsigned int flag);
 
 #ifdef REQ_DISCARD
 #define bio_is_discard(bio) ((bio)->bi_opf & REQ_DISCARD)
@@ -155,8 +156,8 @@ void dattobd_bio_op_clear_flag(struct bio *bio, unsigned int flag);
         (bio_op(bio) == REQ_OP_DISCARD || bio_op(bio) == REQ_OP_SECURE_ERASE)
 #endif
 
-#define dattobd_submit_bio(bio) submit_bio(bio)
-#define dattobd_submit_bio_wait(bio) submit_bio_wait(bio)
+#define moocbt_submit_bio(bio) submit_bio(bio)
+#define moocbt_submit_bio_wait(bio) submit_bio_wait(bio)
 
 #endif
 
@@ -171,19 +172,19 @@ int bio_make_read_clone(struct bio_set *bs, struct tracing_params *tp,
                         struct bio **bio_out, unsigned int *bytes_added);
 
 #ifdef HAVE_BIO_ENDIO_INT
-void dattobd_bio_endio(struct bio *bio, int err);
+void moocbt_bio_endio(struct bio *bio, int err);
 #elif !defined HAVE_BIO_ENDIO_1
-void dattobd_bio_endio(struct bio *bio, int err);
+void moocbt_bio_endio(struct bio *bio, int err);
 #elif defined HAVE_BLK_STATUS_T
-void dattobd_bio_endio(struct bio *bio, int err);
+void moocbt_bio_endio(struct bio *bio, int err);
 #else
-void dattobd_bio_endio(struct bio *bio, int err);
+void moocbt_bio_endio(struct bio *bio, int err);
 #endif
 
 #ifdef HAVE_BIO_BI_BDEV_BD_DISK
-    #define dattobd_bio_bi_disk(bio) ((bio)->bi_bdev->bd_disk)
+    #define moocbt_bio_bi_disk(bio) ((bio)->bi_bdev->bd_disk)
 #else
-    #define dattobd_bio_bi_disk(bio) ((bio)->bi_disk)
+    #define moocbt_bio_bi_disk(bio) ((bio)->bi_disk)
 #endif
 
 #if !defined HAVE_BIO_FOR_EACH_SEGMENT_ALL_1 && !defined HAVE_BIO_FOR_EACH_SEGMENT_ALL_2
