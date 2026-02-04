@@ -2,6 +2,7 @@
 
 /*
  * Copyright (C) 2022 Datto Inc.
+ * Additional contributions by Slide are Copyright (C) 2026 Project Orca Inc.
  */
 
 #include "blkdev.h"
@@ -11,7 +12,7 @@
 #if !defined HAVE_BLKDEV_GET_BY_PATH && !defined HAVE_BLKDEV_GET_BY_PATH_4 && !defined HAVE_BDEV_OPEN_BY_PATH && !defined HAVE_BDEV_FILE_OPEN_BY_PATH
 
 /**
- * dattobd_lookup_bdev() - Looks up the inode associated with the path, verifies
+ * moocbt_lookup_bdev() - Looks up the inode associated with the path, verifies
  * that the file is a block special file, and asks the kernel for a &struct
  * block_device associated with the file.
  *
@@ -22,7 +23,7 @@
  * On success the @block_device structure otherwise an error created via
  * ERR_PTR().
  */
-static struct block_device *dattobd_lookup_bdev(const char *pathname,
+static struct block_device *moocbt_lookup_bdev(const char *pathname,
                                                 fmode_t mode)
 {
         int r;
@@ -34,7 +35,7 @@ static struct block_device *dattobd_lookup_bdev(const char *pathname,
         if ((r = path_lookup(pathname, LOOKUP_FOLLOW, &nd)))
                 goto fail;
 
-        inode = dattobd_get_nd_dentry(nd)->d_inode;
+        inode = moocbt_get_nd_dentry(nd)->d_inode;
         if (!inode) {
                 r = -ENOENT;
                 goto fail;
@@ -62,7 +63,7 @@ fail:
 
 /**
  * _blkdev_get_by_path() - Fetches the @block_device struct associated with the
- * @pathname.  This is very similar to @dattobd_lookup_bdev with minor
+ * @pathname.  This is very similar to @moocbt_lookup_bdev with minor
  * additional validation.
  *
  * @pathname: the path name of a block special file.
@@ -77,12 +78,12 @@ static struct block_device *_blkdev_get_by_path(const char *pathname, fmode_t mo
                                         void *holder)
 {
         struct block_device *bdev;
-        bdev = dattobd_lookup_bdev(pathname, mode);
+        bdev = moocbt_lookup_bdev(pathname, mode);
         if (IS_ERR(bdev))
                 return bdev;
 
         if ((mode & FMODE_WRITE) && bdev_read_only(bdev)) {
-                dattobd_blkdev_put(bdev);
+                moocbt_blkdev_put(bdev);
                 return ERR_PTR(-EACCES);
         }
 
@@ -92,7 +93,7 @@ static struct block_device *_blkdev_get_by_path(const char *pathname, fmode_t mo
 #endif
 
 /**
- * dattobd_blkdev_by_path() - Fetches the @block_device struct associated with the
+ * moocbt_blkdev_by_path() - Fetches the @block_device struct associated with the
  * @path. This function uses different methods based on available kernel functions
  * to retrieve the block device. Returns @bdev_handle struct which contains
  * information about @block_device and @holder. Made to be in compliance with kernel
@@ -106,7 +107,7 @@ static struct block_device *_blkdev_get_by_path(const char *pathname, fmode_t mo
  * On success the @bdev_handle structure otherwise an error created via
  * ERR_PTR().
  */
-struct bdev_wrapper *dattobd_blkdev_by_path(const char *path, fmode_t mode,
+struct bdev_wrapper *moocbt_blkdev_by_path(const char *path, fmode_t mode,
                                         void *holder)
 {
         struct bdev_wrapper *bw = kmalloc(sizeof(struct bdev_wrapper), GFP_KERNEL);
@@ -149,7 +150,7 @@ struct bdev_wrapper *dattobd_blkdev_by_path(const char *path, fmode_t mode,
 }
 
 /**
- * dattobd_get_super() - Scans the superblock list and finds the superblock of the 
+ * moocbt_get_super() - Scans the superblock list and finds the superblock of the 
  * file system mounted on the @bd given. This function uses different methods 
  * based on available kernel functions to retrieve the super block.
  *
@@ -158,7 +159,7 @@ struct bdev_wrapper *dattobd_blkdev_by_path(const char *path, fmode_t mode,
  * Return:
  * On success the @super_block structure pointer otherwise NULL.
  */
-struct super_block *dattobd_get_super(struct block_device * bd)
+struct super_block *moocbt_get_super(struct block_device * bd)
 {
 #if defined HAVE_BD_SUPER
         return (bd != NULL) ? bd->bd_super : NULL;
@@ -175,7 +176,7 @@ struct super_block *dattobd_get_super(struct block_device * bd)
 }
 
 /**
- * dattobd_drop_super() - Releases the superblock of the file system.
+ * moocbt_drop_super() - Releases the superblock of the file system.
  * This function performs the appropriate action based on the available
  * kernel functions to release or drop the superblock.
  *
@@ -184,7 +185,7 @@ struct super_block *dattobd_get_super(struct block_device * bd)
  * Return:
  * void.
  */
-void dattobd_drop_super(struct super_block *sb) 
+void moocbt_drop_super(struct super_block *sb) 
 {
 #if defined HAVE_BD_SUPER
         return;
@@ -200,7 +201,7 @@ void dattobd_drop_super(struct super_block *sb)
 }
 
 /**
- * dattobd_blkdev_put() - Releases a reference to a block device.
+ * moocbt_blkdev_put() - Releases a reference to a block device.
  * This function performs the appropriate action based on the available
  * kernel functions to release block device.
  *
@@ -209,7 +210,7 @@ void dattobd_drop_super(struct super_block *sb)
  * Return:
  * void.
  */
-void dattobd_blkdev_put(struct bdev_wrapper *bw) 
+void moocbt_blkdev_put(struct bdev_wrapper *bw) 
 {
         if(unlikely(IS_ERR_OR_NULL(bw)))
                 return;
@@ -231,7 +232,7 @@ void dattobd_blkdev_put(struct bdev_wrapper *bw)
 }
 
 /**
- * dattobd_get_start_sect_by_gendisk_for_bio() - Get starting sector of partition according to gendisk and partition number. 
+ * moocbt_get_start_sect_by_gendisk_for_bio() - Get starting sector of partition according to gendisk and partition number. 
  * 
  * @gd: gendisk
  * @partno: partition number
@@ -240,7 +241,7 @@ void dattobd_blkdev_put(struct bdev_wrapper *bw)
  * Result:
  * 0 on success, error otherwise
  */
-int dattobd_get_start_sect_by_gendisk_for_bio(struct gendisk* gd, u8 partno, sector_t* result){
+int moocbt_get_start_sect_by_gendisk_for_bio(struct gendisk* gd, u8 partno, sector_t* result){
 #if defined HAVE_BDGET_DISK
         struct block_device* bd = bdget_disk(gd, partno);
         if(!bd)
@@ -268,7 +269,7 @@ int dattobd_get_start_sect_by_gendisk_for_bio(struct gendisk* gd, u8 partno, sec
 
 
 /**
- * dattobd_get_kstatfs() - Get the file system statistics of the block device.
+ * moocbt_get_kstatfs() - Get the file system statistics of the block device.
  *
  * @bd: block device structure pointer.
  * @statfs: file system statistics structure pointer.
@@ -276,33 +277,33 @@ int dattobd_get_start_sect_by_gendisk_for_bio(struct gendisk* gd, u8 partno, sec
  * Return:
  * 0 on success, error otherwise.
  */
-int dattobd_get_kstatfs(struct block_device* bd, struct kstatfs* statfs){
+int moocbt_get_kstatfs(struct block_device* bd, struct kstatfs* statfs){
         struct super_block* sb;
         int ret;
 
         ret = 0;
-        sb = dattobd_get_super(bd);
+        sb = moocbt_get_super(bd);
 
         if(sb){
                 if(sb->s_op && sb->s_op->statfs && sb->s_root){
                         ret = sb->s_op->statfs(sb->s_root, statfs);
 
                         if(ret){
-                                LOG_ERROR(ret, "dattobd_get_kstatfs: error getting statfs from super block");
+                                LOG_ERROR(ret, "moocbt_get_kstatfs: error getting statfs from super block");
                                 goto done;
                         }
 
-                        LOG_DEBUG("dattobd_get_kstatfs: free blocks: %llu, block size: %ld, total: %llu\n", statfs->f_bavail, statfs->f_bsize, statfs->f_bavail*statfs->f_bsize);
+                        LOG_DEBUG("moocbt_get_kstatfs: free blocks: %llu, block size: %ld, total: %llu\n", statfs->f_bavail, statfs->f_bsize, statfs->f_bavail*statfs->f_bsize);
                         goto done;
                 }else{
                         ret = -EINVAL;
                         
-                        LOG_ERROR(ret, "dattobd_get_kstatfs: super block does not have statfs operations or root dentry");
+                        LOG_ERROR(ret, "moocbt_get_kstatfs: super block does not have statfs operations or root dentry");
                         goto done;
                 }
         }
 
 done:
-        dattobd_drop_super(sb);
+        moocbt_drop_super(sb);
         return ret;
 }

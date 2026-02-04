@@ -6,7 +6,7 @@
 #
 
 echo
-echo "dattobd: $(git rev-parse --short HEAD)"
+echo "moocbt: $(git rev-parse --short HEAD)"
 echo "kernel: $(uname -r)"
 echo "gcc: $(gcc --version | awk 'NR==1 {print $3}')"
 echo "bash: ${BASH_VERSION}"

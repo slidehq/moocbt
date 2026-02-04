@@ -2,7 +2,7 @@
 
 type getarg >/dev/null 2>&1 || . /lib/dracut-lib.sh
 
-modprobe dattobd
+modprobe moocbt
 
 [ -z "$root" ] && root=$(getarg root=)
 [ -z "$rootfstype" ] && rootfstype=$(getarg rootfstype=)
@@ -25,7 +25,7 @@ if [ -n "$rbd" ]; then
             ;;
     esac
 
-    echo "dattobd: root block device = $rbd" > /dev/kmsg
+    echo "moocbt: root block device = $rbd" > /dev/kmsg
 
     # Device might not be ready
     if [ ! -b "$rbd" ]; then
@@ -35,17 +35,17 @@ if [ -n "$rbd" ]; then
     # Kernel cmdline might not specify rootfstype
     [ -z "$rootfstype" ] && rootfstype=$(blkid -s TYPE "$rbd" -o value)
 
-    echo "dattobd: mounting $rbd as $rootfstype" > /dev/kmsg
+    echo "moocbt: mounting $rbd as $rootfstype" > /dev/kmsg
     blockdev --setro $rbd
-    mount -t $rootfstype -o ro "$rbd" /etc/datto/dla/mnt
+    mount -t $rootfstype -o ro "$rbd" /etc/moocbt/mnt
     udevadm settle
 
-    if [ -x /sbin/datto_reload ]; then
-        /sbin/datto_reload
+    if [ -x /sbin/moo_reload ]; then
+        /sbin/moo_reload
     else
-        echo "dattobd: error: cannot reload tracking data: missing /sbin/datto_reload" > /dev/kmsg
+        echo "moocbt: error: cannot reload tracking data: missing /sbin/moo_reload" > /dev/kmsg
     fi
 
-    umount -f /etc/datto/dla/mnt
+    umount -f /etc/moocbt/mnt
     blockdev --setrw $rbd
 fi

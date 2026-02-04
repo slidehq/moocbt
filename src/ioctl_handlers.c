@@ -2,12 +2,13 @@
 
 /*
  * Copyright (C) 2022 Datto Inc.
+ * Additional contributions by Slide are Copyright (C) 2026 Project Orca Inc.
  */
 
 #include "ioctl_handlers.h"
 
 #include "blkdev.h"
-#include "dattobd.h"
+#include "moocbt.h"
 #include "hints.h"
 #include "includes.h"
 #include "logging.h"
@@ -57,7 +58,7 @@ struct mutex ioctl_mutex;
 static int __verify_minor(unsigned int minor, int mode, snap_device_array snap_devices)
 {
         // check minor number is within range
-        if (minor >= dattobd_max_snap_devices) {
+        if (minor >= moocbt_max_snap_devices) {
                 LOG_ERROR(-EINVAL, "minor number specified is out of range");
                 return -EINVAL;
         }
@@ -102,20 +103,20 @@ static int __verify_bdev_writable(const char *bdev_path, int *out)
         struct super_block *sb;
 
         // open the base block device
-        bdev_w = dattobd_blkdev_by_path(bdev_path, FMODE_READ, NULL);
+        bdev_w = moocbt_blkdev_by_path(bdev_path, FMODE_READ, NULL);
 
         if (IS_ERR(bdev_w)) {
                 *out = 0;
                 return PTR_ERR(bdev_w);
         }
 
-        sb = dattobd_get_super(bdev_w->bdev);
+        sb = moocbt_get_super(bdev_w->bdev);
         if (!IS_ERR_OR_NULL(sb)) {
                 writable = !(sb->s_flags & MS_RDONLY);
-                dattobd_drop_super(sb);
+                moocbt_drop_super(sb);
         }
 
-        dattobd_blkdev_put(bdev_w);
+        moocbt_blkdev_put(bdev_w);
         *out = writable;
         return 0;
 }
@@ -527,22 +528,22 @@ error:
 }
 
 /**
- * ioctl_dattobd_info() - Stores relevant, current &struct snap_device state
+ * ioctl_moocbt_info() - Stores relevant, current &struct snap_device state
  *                        in @info.
  *
- * @info: A @struct dattobd_info object pointer.
+ * @info: A @struct moocbt_info object pointer.
  *
  * Return:
  * * 0 - successful.
  * * !0 - errno indicating the error.
  */
-static int ioctl_dattobd_info(struct dattobd_info *info)
+static int ioctl_moocbt_info(struct moocbt_info *info)
 {
         int ret;
         struct snap_device *dev;
         snap_device_array snap_devices = get_snap_device_array();
 
-        LOG_DEBUG("received dattobd info ioctl - %u", info->minor);
+        LOG_DEBUG("received moocbt info ioctl - %u", info->minor);
 
         // verify that the minor number is valid
         ret = verify_minor_in_use(info->minor, snap_devices);
@@ -551,7 +552,7 @@ static int ioctl_dattobd_info(struct dattobd_info *info)
 
         dev = snap_devices[info->minor];
 
-        tracer_dattobd_info(dev, info);
+        tracer_moocbt_info(dev, info);
 
         put_snap_device_array(snap_devices);
         return 0;
@@ -606,7 +607,7 @@ long ctrl_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
         int ret, idx;
         char *bdev_path = NULL;
         char *cow_path = NULL;
-        struct dattobd_info *info = NULL;
+        struct moocbt_info *info = NULL;
         unsigned int minor = 0;
         unsigned long fallocated_space = 0, cache_size = 0;
         struct expand_cow_file_params *expand_params = NULL;
@@ -710,36 +711,36 @@ long ctrl_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
                         break;
 
                 break;
-        case IOCTL_DATTOBD_INFO:
+        case IOCTL_MOOCBT_INFO:
                 // get params from user space
-                info = kmalloc(sizeof(struct dattobd_info), GFP_KERNEL);
+                info = kmalloc(sizeof(struct moocbt_info), GFP_KERNEL);
                 if (!info) {
                         ret = -ENOMEM;
                         LOG_ERROR(ret,
-                                  "error allocating memory for dattobd info");
+                                  "error allocating memory for moocbt info");
                         break;
                 }
 
-                ret = copy_from_user(info, (struct dattobd_info __user *)arg,
-                                     sizeof(struct dattobd_info));
+                ret = copy_from_user(info, (struct moocbt_info __user *)arg,
+                                     sizeof(struct moocbt_info));
                 if (ret) {
                         ret = -EFAULT;
-                        LOG_ERROR(ret, "error copying dattobd info struct from "
+                        LOG_ERROR(ret, "error copying moocbt info struct from "
                                        "user space");
                         break;
                 }
 
-                ret = ioctl_dattobd_info(info);
+                ret = ioctl_moocbt_info(info);
                 if (ret)
                         break;
 
-                ret = copy_to_user((struct dattobd_info __user *)arg, info,
-                                   sizeof(struct dattobd_info));
+                ret = copy_to_user((struct moocbt_info __user *)arg, info,
+                                   sizeof(struct moocbt_info));
                 if (ret) {
                         ret = -EFAULT;
                         LOG_ERROR(
                                 ret,
-                                "error copying dattobd info struct to user space");
+                                "error copying moocbt info struct to user space");
                         break;
                 }
 

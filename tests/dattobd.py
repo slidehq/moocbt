@@ -2,6 +2,7 @@
 
 #
 # Copyright (C) 2019 Datto, Inc.
+# Additional contributions by Slide are Copyright (C) 2026 Project Orca Inc.
 #
 
 from cffi import FFI
@@ -14,7 +15,7 @@ ffi.cdef("""
 #define COW_UUID_SIZE 16
 #define PATH_MAX 4096
 
-struct dattobd_info {
+struct moocbt_info {
     unsigned int minor;
     unsigned long state;
     int error;
@@ -28,22 +29,22 @@ struct dattobd_info {
     unsigned long long nr_changed_blocks;
 };
 
-int dattobd_setup_snapshot(unsigned int minor, char *bdev, char *cow, unsigned long fallocated_space, unsigned long cache_size);
-int dattobd_reload_snapshot(unsigned int minor, char *bdev, char *cow, unsigned long cache_size);
-int dattobd_reload_incremental(unsigned int minor, char *bdev, char *cow, unsigned long cache_size);
-int dattobd_destroy(unsigned int minor);
-int dattobd_transition_incremental(unsigned int minor);
-int dattobd_transition_snapshot(unsigned int minor, char *cow, unsigned long fallocated_space);
-int dattobd_reconfigure(unsigned int minor, unsigned long cache_size);
-int dattobd_info(unsigned int minor, struct dattobd_info *info);
-int dattobd_get_free_minor(void);
+int moocbt_setup_snapshot(unsigned int minor, char *bdev, char *cow, unsigned long fallocated_space, unsigned long cache_size);
+int moocbt_reload_snapshot(unsigned int minor, char *bdev, char *cow, unsigned long cache_size);
+int moocbt_reload_incremental(unsigned int minor, char *bdev, char *cow, unsigned long cache_size);
+int moocbt_destroy(unsigned int minor);
+int moocbt_transition_incremental(unsigned int minor);
+int moocbt_transition_snapshot(unsigned int minor, char *cow, unsigned long fallocated_space);
+int moocbt_reconfigure(unsigned int minor, unsigned long cache_size);
+int moocbt_info(unsigned int minor, struct moocbt_info *info);
+int moocbt_get_free_minor(void);
 """)
 
-lib = ffi.dlopen("../lib/libdattobd.so")
+lib = ffi.dlopen("../lib/libmoocbt.so")
 
 
 def setup(minor, device, cow_file, fallocated_space=0, cache_size=0):
-    ret = lib.dattobd_setup_snapshot(
+    ret = lib.moocbt_setup_snapshot(
         minor,
         device.encode("utf-8"),
         cow_file.encode("utf-8"),
@@ -59,7 +60,7 @@ def setup(minor, device, cow_file, fallocated_space=0, cache_size=0):
 
 
 def reload_snapshot(minor, device, cow_file, cache_size=0):
-    ret = lib.dattobd_reload_snapshot(
+    ret = lib.moocbt_reload_snapshot(
         minor,
         device.encode("utf-8"),
         cow_file.encode("utf-8"),
@@ -74,7 +75,7 @@ def reload_snapshot(minor, device, cow_file, cache_size=0):
 
 
 def reload_incremental(minor, device, cow_file, cache_size=0):
-    ret = lib.dattobd_reload_incremental(
+    ret = lib.moocbt_reload_incremental(
         minor,
         device.encode("utf-8"),
         cow_file.encode("utf-8"),
@@ -89,7 +90,7 @@ def reload_incremental(minor, device, cow_file, cache_size=0):
 
 
 def destroy(minor):
-    ret = lib.dattobd_destroy(minor)
+    ret = lib.moocbt_destroy(minor)
     if ret != 0:
         return ffi.errno
 
@@ -98,7 +99,7 @@ def destroy(minor):
 
 
 def transition_to_incremental(minor):
-    ret = lib.dattobd_transition_incremental(minor)
+    ret = lib.moocbt_transition_incremental(minor)
     if ret != 0:
         return ffi.errno
 
@@ -107,7 +108,7 @@ def transition_to_incremental(minor):
 
 
 def transition_to_snapshot(minor, cow_file, fallocated_space=0):
-    ret = lib.dattobd_transition_snapshot(
+    ret = lib.moocbt_transition_snapshot(
         minor,
         cow_file.encode("utf-8"),
         fallocated_space
@@ -121,7 +122,7 @@ def transition_to_snapshot(minor, cow_file, fallocated_space=0):
 
 
 def reconfigure(minor, cache_size):
-    ret = lib.dattobd_reconfigure(minor, cache_size)
+    ret = lib.moocbt_reconfigure(minor, cache_size)
     if ret != 0:
         return ffi.errno
 
@@ -130,8 +131,8 @@ def reconfigure(minor, cache_size):
 
 
 def info(minor):
-    di = ffi.new("struct dattobd_info *")
-    ret = lib.dattobd_info(minor, di)
+    di = ffi.new("struct moocbt_info *")
+    ret = lib.moocbt_info(minor, di)
     if ret != 0:
         return None
 
@@ -152,11 +153,11 @@ def info(minor):
     }
 
 def get_free_minor():
-    ret = lib.dattobd_get_free_minor()
+    ret = lib.moocbt_get_free_minor()
     if (ret < 0):
         return -ffi.errno
     return ret
 
 def version():
-    with open("/sys/module/dattobd/version", "r") as v:
+    with open("/sys/module/moocbt/version", "r") as v:
         return v.read().strip()

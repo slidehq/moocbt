@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-only
 
 SRCS := $(notdir $(wildcard $M/*.c))
-MODULE_NAME := dattobd
+MODULE_NAME := moocbt
 obj-m += $(MODULE_NAME).o
 $(MODULE_NAME)-y := $(SRCS:.c=.o)
 
@@ -25,4 +25,4 @@ install: default
 	$(MAKE) -C $(KDIR) M=$(PWD) modules_install
 
 uninstall:
-	$(RM) /lib/modules/$(KERNELVERSION)/$(INSTALL_MOD_DIR)/dattobd.ko
+	$(RM) /lib/modules/$(KERNELVERSION)/$(INSTALL_MOD_DIR)/moocbt.ko

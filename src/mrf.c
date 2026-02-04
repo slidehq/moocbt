@@ -2,6 +2,7 @@
 
 /*
  * Copyright (C) 2022 Datto Inc.
+ * Additional contributions by Slide are Copyright (C) 2026 Project Orca Inc.
  */
 
 #include "mrf.h"
@@ -16,20 +17,20 @@
 #endif
 
 #ifdef HAVE_MAKE_REQUEST_FN_INT
-int dattobd_call_mrf(make_request_fn *fn, struct request_queue *q,
+int moocbt_call_mrf(make_request_fn *fn, struct request_queue *q,
                      struct bio *bio)
 {
         return fn(q, bio);
 }
 #elif defined HAVE_MAKE_REQUEST_FN_VOID
-int dattobd_call_mrf(make_request_fn *fn, struct request_queue *q,
+int moocbt_call_mrf(make_request_fn *fn, struct request_queue *q,
                      struct bio *bio)
 {
         fn(q, bio);
         return 0;
 }
 #elif !defined USE_BDOPS_SUBMIT_BIO
-int dattobd_call_mrf(make_request_fn *fn, struct request_queue *q,
+int moocbt_call_mrf(make_request_fn *fn, struct request_queue *q,
                      struct bio *bio)
 {
         return fn(q, bio);
@@ -38,7 +39,7 @@ int dattobd_call_mrf(make_request_fn *fn, struct request_queue *q,
 
 #ifdef HAVE_BLK_ALLOC_QUEUE
 //#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,7,0)
-MRF_RETURN_TYPE dattobd_null_mrf(struct request_queue *q, struct bio *bio)
+MRF_RETURN_TYPE moocbt_null_mrf(struct request_queue *q, struct bio *bio)
 {
         percpu_ref_get(&q->q_usage_counter);
         // create a make_request_fn for the supplied request_queue.
@@ -48,16 +49,16 @@ MRF_RETURN_TYPE dattobd_null_mrf(struct request_queue *q, struct bio *bio)
 
 #ifdef USE_BDOPS_SUBMIT_BIO
 
-MRF_RETURN_TYPE (*dattobd_blk_mq_submit_bio)(struct bio*)= (BLK_MQ_SUBMIT_BIO_ADDR != 0) ? 
+MRF_RETURN_TYPE (*moocbt_blk_mq_submit_bio)(struct bio*)= (BLK_MQ_SUBMIT_BIO_ADDR != 0) ? 
     (MRF_RETURN_TYPE (*)(struct bio*)) (BLK_MQ_SUBMIT_BIO_ADDR + (long long)(((void*)kfree)-(void*)KFREE_ADDR)): NULL;
 
-MRF_RETURN_TYPE dattobd_snap_null_mrf(struct bio *bio){
+MRF_RETURN_TYPE moocbt_snap_null_mrf(struct bio *bio){
 #ifdef HAVE_NONVOID_SUBMIT_BIO_1
     MRF_RETURN_TYPE exists_to_align_api_only = 0;
-    percpu_ref_get(&(dattobd_bio_bi_disk(bio))->queue->q_usage_counter);
+    percpu_ref_get(&(moocbt_bio_bi_disk(bio))->queue->q_usage_counter);
 #endif
 
-    dattobd_blk_mq_submit_bio(bio);
+    moocbt_blk_mq_submit_bio(bio);
 
 #ifdef HAVE_NONVOID_SUBMIT_BIO_1
     return exists_to_align_api_only;
@@ -66,7 +67,7 @@ MRF_RETURN_TYPE dattobd_snap_null_mrf(struct bio *bio){
 #endif
 }
 
-MRF_RETURN_TYPE dattobd_null_mrf(struct bio *bio)
+MRF_RETURN_TYPE moocbt_null_mrf(struct bio *bio)
 {
     // Before we can submit our bio to the original device... 
     // If there's any bio in the bio_list that ISN'T our bio, requeue it and 
@@ -96,40 +97,40 @@ MRF_RETURN_TYPE dattobd_null_mrf(struct bio *bio)
     return submit_bio(bio);
 }
 
-int dattobd_call_mrf_real(struct snap_device *dev, struct bio *bio){
-	return dattobd_call_mrf(dev->sd_orig_request_fn, dattobd_bio_get_queue(bio), bio);
+int moocbt_call_mrf_real(struct snap_device *dev, struct bio *bio){
+	return moocbt_call_mrf(dev->sd_orig_request_fn, moocbt_bio_get_queue(bio), bio);
 }
 
-int dattobd_call_mrf(make_request_fn *fn, struct request_queue *q,
+int moocbt_call_mrf(make_request_fn *fn, struct request_queue *q,
                      struct bio *bio)
 {
         fn(bio);
         return 0;
 }
 
-make_request_fn* dattobd_get_gd_mrf(struct gendisk *gd){
+make_request_fn* moocbt_get_gd_mrf(struct gendisk *gd){
 	return gd->fops->submit_bio;
 }
 
-struct block_device_operations* dattobd_get_bd_ops(struct block_device *bdev){
+struct block_device_operations* moocbt_get_bd_ops(struct block_device *bdev){
 	return (struct block_device_operations*)bdev->bd_disk->fops;
 }
 
 #else
-int dattobd_call_mrf_real(struct snap_device *dev, struct bio *bio)
+int moocbt_call_mrf_real(struct snap_device *dev, struct bio *bio)
 {
-    return dattobd_call_mrf(
+    return moocbt_call_mrf(
         dev->sd_orig_request_fn,
-        dattobd_bio_get_queue(bio), 
+        moocbt_bio_get_queue(bio), 
         bio);
 }
 
-make_request_fn* dattobd_get_gd_mrf(struct gendisk *gd)
+make_request_fn* moocbt_get_gd_mrf(struct gendisk *gd)
 {
     return gd->queue->make_request_fn;
 }
 #endif
 
-make_request_fn* dattobd_get_bd_mrf(struct block_device *bdev){
-    return dattobd_get_gd_mrf(bdev->bd_disk);
+make_request_fn* moocbt_get_bd_mrf(struct block_device *bdev){
+    return moocbt_get_gd_mrf(bdev->bd_disk);
 }

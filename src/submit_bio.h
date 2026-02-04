@@ -2,6 +2,7 @@
 
 /*
  * Copyright (C) 2022-2023 Datto Inc.
+ * Additional contributions by Slide are Copyright (C) 2026 Project Orca Inc.
  */
 
 #ifndef SUBMIT_BIO_H_
@@ -22,7 +23,7 @@ struct snap_device;
 typedef MRF_RETURN_TYPE (submit_bio_fn) (struct bio *bio);
 
 /**
- * dattobd_submit_bio_real() - Submit's given bio to the real device 
+ * moocbt_submit_bio_real() - Submit's given bio to the real device 
  *                            (as opposed to our driver).
  *
  * @dev: Pointer to the snap_device that keeps device state.
@@ -32,7 +33,7 @@ typedef MRF_RETURN_TYPE (submit_bio_fn) (struct bio *bio);
  * * 0 - success
  * * !0 - error
  */
-int dattobd_submit_bio_real(
+int moocbt_submit_bio_real(
     struct snap_device* dev,
     struct bio *bio
 );

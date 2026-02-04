@@ -2,6 +2,7 @@
 
 /*
  * Copyright (C) 2015 Datto Inc.
+ * Additional contributions by Slide are Copyright (C) 2026 Project Orca Inc.
  */
 
 #include "includes.h"

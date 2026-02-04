@@ -31,8 +31,8 @@
 
 %if "%{_vendor}" == "suse"
 %if 0%{?suse_version} > 0 && 0%{?suse_version} >= 1500
-# Since SLES 15 SP 2, dattobd.ko is considered as requirement, we have to disable this behavior
-%global __requires_exclude ^.*dattobd\.ko.*$
+# Since SLES 15 SP 2, moocbt.ko is considered as requirement, we have to disable this behavior
+%global __requires_exclude ^.*moocbt\.ko.*$
 %endif
 %endif
 
@@ -114,7 +114,7 @@
 %endif
 
 # Set up library package names properly
-%global libprefix libdattobd
+%global libprefix libmoocbt
 %global libsover 1
 
 %if "%{_vendor}" == "debbuild"
@@ -135,13 +135,13 @@
 %bcond_with devmode
 
 
-Name:            dattobd
+Name:            moocbt
 Version:         0.12.1
 Release:         1%{?dist}
 Summary:         Kernel module and utilities for enabling low-level live backups
-Vendor:          Datto, Inc.
+Vendor:          Project Orca Inc.
 %if "%{_vendor}" == "debbuild"
-Packager:        Datto Software Packagers <swpackages@datto.com>
+Packager:        Slide Packagers <it@slide.tech>
 Group:           kernel
 License:         GPL-2.0
 %else
@@ -154,7 +154,7 @@ License:         GPLv2
 %endif
 %endif
 
-URL:             https://github.com/datto/dattobd
+URL:             https://github.com/slidehq/moocbt
 %if ! %{with devmode}
 Source0:         %{url}/archive/v%{version}/%{name}-%{version}.tar.gz
 %else
@@ -176,7 +176,7 @@ BuildRequires: systemd-rpm-macros
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 
 %description
-The Datto Block Driver is a kernel module that enables
+The Moo Continuous Block Tracker is a kernel module that enables
 live image backups through block devices.
 
 %package -n %{libname}
@@ -322,18 +322,18 @@ make utils
 %install
 # Install library
 mkdir -p %{buildroot}%{_libdir}/pkgconfig
-install -p -m 0755 lib/libdattobd.so.%{libsover} %{buildroot}%{_libdir}/
-ln -sf libdattobd.so.%{libsover} %{buildroot}%{_libdir}/libdattobd.so
-install -p -m 0644 dist/libdattobd.pc.in %{buildroot}%{_libdir}/pkgconfig/libdattobd.pc
-mkdir -p %{buildroot}%{_includedir}/dattobd
-install -p -m 0644 lib/libdattobd.h %{buildroot}%{_includedir}/dattobd/libdattobd.h
-install -p -m 0644 src/dattobd.h %{buildroot}%{_includedir}/dattobd/dattobd.h
+install -p -m 0755 lib/libmoocbt.so.%{libsover} %{buildroot}%{_libdir}/
+ln -sf libmoocbt.so.%{libsover} %{buildroot}%{_libdir}/libmoocbt.so
+install -p -m 0644 dist/libmoocbt.pc.in %{buildroot}%{_libdir}/pkgconfig/libmoocbt.pc
+mkdir -p %{buildroot}%{_includedir}/moocbt
+install -p -m 0644 lib/libmoocbt.h %{buildroot}%{_includedir}/moocbt/libmoocbt.h
+install -p -m 0644 src/moocbt.h %{buildroot}%{_includedir}/moocbt/moocbt.h
 
 sed -e "s:@prefix@:%{_prefix}:g" \
     -e "s:@libdir@:%{_libdir}:g" \
-    -e "s:@includedir@:%{_includedir}/dattobd:g" \
+    -e "s:@includedir@:%{_includedir}/moocbt:g" \
     -e "s:@PACKAGE_VERSION@:%{version}:g" \
-    -i %{buildroot}%{_libdir}/pkgconfig/libdattobd.pc
+    -i %{buildroot}%{_libdir}/pkgconfig/libmoocbt.pc
 
 
 # Generate symbols for library package (Debian/Ubuntu only)
@@ -351,11 +351,11 @@ dpkg-gensymbols -P%{buildroot} -p%{libname} -v%{version}-%{release} -e%{buildroo
 
 # Install utilities and man pages
 mkdir -p %{buildroot}%{_bindir}
-install -p -m 0755 app/dbdctl %{buildroot}%{_bindir}/dbdctl
+install -p -m 0755 app/moo %{buildroot}%{_bindir}/moo
 mkdir -p %{buildroot}%{_bashcompletionpath}
-install -p -m 0644 app/bash_completion.d/dbdctl %{buildroot}%{_bashcompletionpath}/
+install -p -m 0644 app/bash_completion.d/moo %{buildroot}%{_bashcompletionpath}/
 mkdir -p %{buildroot}%{_mandir}/man8
-install -p -m 0644 doc/dbdctl.8 %{buildroot}%{_mandir}/man8/dbdctl.8
+install -p -m 0644 doc/moo.8 %{buildroot}%{_mandir}/man8/moo.8
 install -p -m 0755 utils/update-img %{buildroot}%{_bindir}/update-img
 install -p -m 0644 doc/update-img.8 %{buildroot}%{_mandir}/man8/update-img.8
 
@@ -364,51 +364,51 @@ mkdir -p %{buildroot}%{_kmod_src_root}
 rsync -av src/ %{buildroot}%{_kmod_src_root}
 
 # Install DKMS configuration
-install -m 0644 dist/dattobd-dkms-conf %{buildroot}%{_kmod_src_root}/dkms.conf
+install -m 0644 dist/moocbt-dkms-conf %{buildroot}%{_kmod_src_root}/dkms.conf
 sed -i "s/@MODULE_VERSION@/%{version}/g" %{buildroot}%{_kmod_src_root}/dkms.conf
 
 # Install modern modprobe stuff
 mkdir -p %{buildroot}%{_modules_load_root}
-install -m 0644 dist/dattobd-modprobe-conf %{buildroot}%{_modules_load_root}/%{name}.conf
+install -m 0644 dist/moocbt-modprobe-conf %{buildroot}%{_modules_load_root}/%{name}.conf
 
 # Legacy automatic module loader for RHEL 5/6
 %if 0%{?rhel} && 0%{?rhel} < 7
 mkdir -p %{buildroot}%{_sysconfdir}/sysconfig/modules
-install -m 0755 dist/dattobd-sysconfig-modules %{buildroot}%{_sysconfdir}/sysconfig/modules/dattobd.modules
+install -m 0755 dist/moocbt-sysconfig-modules %{buildroot}%{_sysconfdir}/sysconfig/modules/moocbt.modules
 %endif
 
 # We only need the hook with older distros
 %if 0%{?rhel} == 5 || (0%{?suse_version} && 0%{?suse_version} < 1315) || (0%{?fedora} && 0%{?fedora} < 23)
-# Install the kernel hook to enforce dattobd rebuilds
+# Install the kernel hook to enforce moocbt rebuilds
 mkdir -p %{buildroot}%{_sysconfdir}/kernel/postinst.d
-install -m 755 dist/kernel.postinst.d/50-dattobd %{buildroot}%{_sysconfdir}/kernel/postinst.d/50-dattobd
+install -m 755 dist/kernel.postinst.d/50-moocbt %{buildroot}%{_sysconfdir}/kernel/postinst.d/50-moocbt
 %endif
 
 # RHEL/CentOS 5 will not have the initramfs scripts because its mkinitrd doesn't support scripts
 %if 0%{?rhel} != 5
 
 # Install initramfs stuff
-mkdir -p %{buildroot}%{_sharedstatedir}/datto/dla
-install -m 755 dist/initramfs/reload %{buildroot}%{_sharedstatedir}/datto/dla/reload
+mkdir -p %{buildroot}%{_sharedstatedir}/moocbt
+install -m 755 dist/initramfs/reload %{buildroot}%{_sharedstatedir}/moocbt/reload
 
 # Debian/Ubuntu use initramfs-tools
 %if 0%{?debian} || 0%{?ubuntu}
 mkdir -p %{buildroot}%{_initramfs_tools_root}
 mkdir -p %{buildroot}%{_initramfs_tools_root}/hooks
 mkdir -p %{buildroot}%{_initramfs_tools_root}/scripts/init-premount
-install -m 755 dist/initramfs/initramfs-tools/hooks/dattobd %{buildroot}%{_initramfs_tools_root}/hooks/dattobd
-install -m 755 dist/initramfs/initramfs-tools/scripts/dattobd %{buildroot}%{_initramfs_tools_root}/scripts/init-premount/dattobd
+install -m 755 dist/initramfs/initramfs-tools/hooks/moocbt %{buildroot}%{_initramfs_tools_root}/hooks/moocbt
+install -m 755 dist/initramfs/initramfs-tools/scripts/moocbt %{buildroot}%{_initramfs_tools_root}/scripts/init-premount/moocbt
 %else
 # openSUSE 13.1 and older use mkinitrd
 %if 0%{?suse_version} > 0 && 0%{?suse_version} < 1315
 mkdir -p %{buildroot}%{_mkinitrd_scripts_root}
-install -m 755 dist/initramfs/initrd/boot-dattobd.sh %{buildroot}%{_mkinitrd_scripts_root}/boot-dattobd.sh
-install -m 755 dist/initramfs/initrd/setup-dattobd.sh %{buildroot}%{_mkinitrd_scripts_root}/setup-dattobd.sh
+install -m 755 dist/initramfs/initrd/boot-moocbt.sh %{buildroot}%{_mkinitrd_scripts_root}/boot-moocbt.sh
+install -m 755 dist/initramfs/initrd/setup-moocbt.sh %{buildroot}%{_mkinitrd_scripts_root}/setup-moocbt.sh
 %else
-mkdir -p %{buildroot}%{_dracut_modules_root}/90dattobd
-install -m 755 dist/initramfs/dracut/dattobd.sh %{buildroot}%{_dracut_modules_root}/90dattobd/dattobd.sh
-install -m 755 dist/initramfs/dracut/module-setup.sh %{buildroot}%{_dracut_modules_root}/90dattobd/module-setup.sh
-install -m 755 dist/initramfs/dracut/install %{buildroot}%{_dracut_modules_root}/90dattobd/install
+mkdir -p %{buildroot}%{_dracut_modules_root}/90moocbt
+install -m 755 dist/initramfs/dracut/moocbt.sh %{buildroot}%{_dracut_modules_root}/90moocbt/moocbt.sh
+install -m 755 dist/initramfs/dracut/module-setup.sh %{buildroot}%{_dracut_modules_root}/90moocbt/module-setup.sh
+install -m 755 dist/initramfs/dracut/install %{buildroot}%{_dracut_modules_root}/90moocbt/install
 %endif
 %endif
 %endif
@@ -516,27 +516,27 @@ rm -rf %{buildroot}
 %if 0%{?suse_version}
 %defattr(-,root,root,-)
 %endif
-%{_bindir}/dbdctl
+%{_bindir}/moo
 %{_bindir}/update-img
-%{_bashcompletionpath}/dbdctl
-%{_mandir}/man8/dbdctl.8*
+%{_bashcompletionpath}/moo
+%{_mandir}/man8/moo.8*
 %{_mandir}/man8/update-img.8*
 # Initramfs scripts for all but RHEL 5
 %if 0%{?rhel} != 5
-%dir %{_sharedstatedir}/datto/dla
-%{_sharedstatedir}/datto/dla/reload
+%dir %{_sharedstatedir}/moocbt
+%{_sharedstatedir}/moocbt/reload
 %if 0%{?debian} || 0%{?ubuntu}
-%{_initramfs_tools_root}/hooks/dattobd
-%{_initramfs_tools_root}/scripts/init-premount/dattobd
+%{_initramfs_tools_root}/hooks/moocbt
+%{_initramfs_tools_root}/scripts/init-premount/moocbt
 %else
 %if 0%{?suse_version} > 0 && 0%{?suse_version} < 1315
-%{_mkinitrd_scripts_root}/boot-dattobd.sh
-%{_mkinitrd_scripts_root}/setup-dattobd.sh
+%{_mkinitrd_scripts_root}/boot-moocbt.sh
+%{_mkinitrd_scripts_root}/setup-moocbt.sh
 %else
-%dir %{_dracut_modules_root}/90dattobd
-%{_dracut_modules_root}/90dattobd/dattobd.sh
-%{_dracut_modules_root}/90dattobd/module-setup.sh
-%{_dracut_modules_root}/90dattobd/install
+%dir %{_dracut_modules_root}/90moocbt
+%{_dracut_modules_root}/90moocbt/moocbt.sh
+%{_dracut_modules_root}/90moocbt/module-setup.sh
+%{_dracut_modules_root}/90moocbt/install
 %endif
 %endif
 %endif
@@ -565,7 +565,7 @@ ln -fs %{_systemd_services}/umount-rootfs.service   %{_systemd_services}/reboot.
 %if 0%{?suse_version}
 %defattr(-,root,root,-)
 %endif
-%{_libdir}/libdattobd.so.%{libsover}
+%{_libdir}/libmoocbt.so.%{libsover}
 %if "%{_vendor}" == "redhat"
 %{!?_licensedir:%global license %doc}
 %license COPYING* LICENSING.md
@@ -581,9 +581,9 @@ ln -fs %{_systemd_services}/umount-rootfs.service   %{_systemd_services}/reboot.
 %if 0%{?suse_version}
 %defattr(-,root,root,-)
 %endif
-%{_libdir}/libdattobd.so
-%{_libdir}/pkgconfig/libdattobd.pc
-%{_includedir}/dattobd/
+%{_libdir}/libmoocbt.so
+%{_libdir}/pkgconfig/libmoocbt.pc
+%{_includedir}/moocbt/
 %if "%{_vendor}" == "redhat"
 %{!?_licensedir:%global license %doc}
 %license COPYING* LICENSING.md
@@ -601,12 +601,12 @@ ln -fs %{_systemd_services}/umount-rootfs.service   %{_systemd_services}/reboot.
 %endif
 %if 0%{?rhel} == 5 && 0%{?rhel} == 6 && 0%{?suse_version} == 1110
 # RHEL/CentOS 5/6 and SLE 11 don't support this at all
-%exclude %{_modules_load_root}/dattobd.conf
+%exclude %{_modules_load_root}/moocbt.conf
 %else
-%config %{_modules_load_root}/dattobd.conf
+%config %{_modules_load_root}/moocbt.conf
 %endif
 %if 0%{?rhel} && 0%{?rhel} < 7
-%config %{_sysconfdir}/sysconfig/modules/dattobd.modules
+%config %{_sysconfdir}/sysconfig/modules/moocbt.modules
 %endif
 %dir %{_kmod_src_root}
 %{_kmod_src_root}/*.c
@@ -617,7 +617,7 @@ ln -fs %{_systemd_services}/umount-rootfs.service   %{_systemd_services}/reboot.
 %{_kmod_src_root}/Makefile
 %if 0%{?rhel} == 5 || (0%{?suse_version} && 0%{?suse_version} < 1315) || (0%{?fedora} && 0%{?fedora} < 23)
 %dir %{_sysconfdir}/kernel/postinst.d
-%{_sysconfdir}/kernel/postinst.d/50-dattobd
+%{_sysconfdir}/kernel/postinst.d/50-moocbt
 %endif
 %doc README.md
 %if "%{_vendor}" == "redhat"

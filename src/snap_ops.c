@@ -2,6 +2,7 @@
 
 /*
  * Copyright (C) 2022 Datto Inc.
+ * Additional contributions by Slide are Copyright (C) 2026 Project Orca Inc.
  */
 
 #include "snap_ops.h"
@@ -94,17 +95,17 @@ MRF_RETURN_TYPE snap_mrf(struct request_queue *q, struct bio *bio){
 #else
 // Linux version >= 5.9
 MRF_RETURN_TYPE snap_mrf(struct bio *bio){
-    struct snap_device *dev = dattobd_bio_bi_disk(bio)->queue->queuedata;
+    struct snap_device *dev = moocbt_bio_bi_disk(bio)->queue->queuedata;
 #endif
     //if a write request somehow gets sent in, discard it
     if(bio_data_dir(bio)){
-        dattobd_bio_endio(bio, -EOPNOTSUPP);
+        moocbt_bio_endio(bio, -EOPNOTSUPP);
         MRF_RETURN(0);
     }else if(tracer_read_fail_state(dev)){
-        dattobd_bio_endio(bio, -EIO);
+        moocbt_bio_endio(bio, -EIO);
         MRF_RETURN(0);
     }else if(!test_bit(ACTIVE, &dev->sd_state)){
-        dattobd_bio_endio(bio, -EBUSY);
+        moocbt_bio_endio(bio, -EBUSY);
         MRF_RETURN(0);
     }
 

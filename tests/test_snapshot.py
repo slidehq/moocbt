@@ -3,13 +3,14 @@
 
 #
 # Copyright (C) 2019 Datto, Inc.
+# Additional contributions by Slide are Copyright (C) 2026 Project Orca Inc.
 #
 
 import errno
 import os
 import unittest
 
-import dattobd
+import moocbt
 import util
 from devicetestcase import DeviceTestCase
 
@@ -17,13 +18,13 @@ from devicetestcase import DeviceTestCase
 class TestSnapshot(DeviceTestCase):
     def setUp(self):
         self.device = "/dev/loop0"
-        self.mount = "/tmp/dattobd"
+        self.mount = "/tmp/moocbt"
         self.cow_file = "cow.snap"
         self.cow_full_path = "{}/{}".format(self.mount, self.cow_file)
         self.minor = 1
 
         self.snap_mount = "/mnt"
-        self.snap_device = "/dev/datto{}".format(self.minor)
+        self.snap_device = "/dev/moocbt{}".format(self.minor)
 
     def test_modify_origin(self):
         testfile = "{}/testfile".format(self.mount)
@@ -36,8 +37,8 @@ class TestSnapshot(DeviceTestCase):
         os.sync()
         md5_orig = util.md5sum(testfile)
 
-        self.assertEqual(dattobd.setup(self.minor, self.device, self.cow_full_path), 0)
-        self.addCleanup(dattobd.destroy, self.minor)
+        self.assertEqual(moocbt.setup(self.minor, self.device, self.cow_full_path), 0)
+        self.addCleanup(moocbt.destroy, self.minor)
 
         with open(testfile, "w") as f:
             f.write("jumps over the lazy dog")
@@ -53,11 +54,11 @@ class TestSnapshot(DeviceTestCase):
     def test_track_writes(self):
         testfile = "{}/testfile".format(self.mount)
 
-        self.assertEqual(dattobd.setup(self.minor, self.device, self.cow_full_path), 0)
-        self.addCleanup(dattobd.destroy, self.minor)
+        self.assertEqual(moocbt.setup(self.minor, self.device, self.cow_full_path), 0)
+        self.addCleanup(moocbt.destroy, self.minor)
 
         os.sync()
-        info = dattobd.info(self.minor)
+        info = moocbt.info(self.minor)
         start_nr = info["nr_changed_blocks"]
         self.assertNotEqual(start_nr, 0)
 
@@ -67,18 +68,18 @@ class TestSnapshot(DeviceTestCase):
         self.addCleanup(os.remove, testfile)
         os.sync()
 
-        info = dattobd.info(self.minor)
+        info = moocbt.info(self.minor)
         end_nr = info["nr_changed_blocks"]
         self.assertGreater(end_nr, start_nr)
 
     def test_next_available_minor(self):
-        self.assertEqual(dattobd.get_free_minor(), 0)
+        self.assertEqual(moocbt.get_free_minor(), 0)
 
         # Explicitly use a minor of 0 for testing this function
-        self.assertEqual(dattobd.setup(0, self.device, self.cow_full_path), 0)
-        self.addCleanup(dattobd.destroy, 0)
+        self.assertEqual(moocbt.setup(0, self.device, self.cow_full_path), 0)
+        self.addCleanup(moocbt.destroy, 0)
 
-        self.assertEqual(dattobd.get_free_minor(), 1)
+        self.assertEqual(moocbt.get_free_minor(), 1)
 
 
 if __name__ == "__main__":

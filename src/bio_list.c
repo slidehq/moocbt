@@ -4,6 +4,7 @@
  * Contains code related to manipulating a bio_list structure.
  *
  * Copyright (C) 2022 Datto Inc.
+ * Additional contributions by Slide are Copyright (C) 2026 Project Orca Inc.
  */
 
 #include "bio_list.h"

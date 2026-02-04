@@ -2,6 +2,7 @@
 
 /*
  * Copyright (C) 2022 Datto Inc.
+ * Additional contributions by Slide are Copyright (C) 2026 Project Orca Inc.
  */
 
 #ifndef BLKDEV_H_
@@ -34,25 +35,25 @@ struct bdev_wrapper{
 
 #ifndef HAVE_HD_STRUCT
 //#if LINUX_VERSION_CODE < KERNEL_VERSION(5,11,0)
-#define dattobd_bdev_size(bdev) (bdev_nr_sectors(bdev))
+#define moocbt_bdev_size(bdev) (bdev_nr_sectors(bdev))
 #elif !defined HAVE_PART_NR_SECTS_READ
 //#if LINUX_VERSION_CODE < KERNEL_VERSION(3,6,0)
-#define dattobd_bdev_size(bdev) ((bdev)->bd_part->nr_sects)
+#define moocbt_bdev_size(bdev) ((bdev)->bd_part->nr_sects)
 #else
-#define dattobd_bdev_size(bdev) part_nr_sects_read((bdev)->bd_part)
+#define moocbt_bdev_size(bdev) part_nr_sects_read((bdev)->bd_part)
 #endif
 
 
-struct bdev_wrapper *dattobd_blkdev_by_path(const char *path, fmode_t mode,
+struct bdev_wrapper *moocbt_blkdev_by_path(const char *path, fmode_t mode,
                                         void *holder);
 
-struct super_block *dattobd_get_super(struct block_device * bd);
+struct super_block *moocbt_get_super(struct block_device * bd);
 
-void dattobd_drop_super(struct super_block *sb);
+void moocbt_drop_super(struct super_block *sb);
 
-void dattobd_blkdev_put(struct bdev_wrapper *bd);
+void moocbt_blkdev_put(struct bdev_wrapper *bd);
 
-int dattobd_get_start_sect_by_gendisk_for_bio(struct gendisk* gd, u8 partno, sector_t* result);
+int moocbt_get_start_sect_by_gendisk_for_bio(struct gendisk* gd, u8 partno, sector_t* result);
 
-int dattobd_get_kstatfs(struct block_device* bd, struct kstatfs* statfs);
+int moocbt_get_kstatfs(struct block_device* bd, struct kstatfs* statfs);
 #endif /* BLKDEV_H_ */

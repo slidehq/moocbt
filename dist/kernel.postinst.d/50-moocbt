@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Scriptlet to force dattobd kernel module to be rebuilt
+# Scriptlet to force moocbt kernel module to be rebuilt
 # on systems that don't automatically do it for kernel updates
 # See http://lists.us.dell.com/pipermail/dkms-devel/2007-May/000562.html
 
@@ -15,23 +15,23 @@ fi
 # we wouldn't be here if dkms wasn't working, so
 # we can happily just call dkms to fix the mess
 
-echo "Forcing rebuild of dattobd."
+echo "Forcing rebuild of moocbt."
 
 
-# but first we need the dattobd version number
+# but first we need the moocbt version number
 
-dattobd_ver=`modinfo  dattobd |grep "^version:" | awk '{ print $2 }'`
-echo "Found dattobd version $dattobd_ver"
+moocbt_ver=`modinfo  moocbt |grep "^version:" | awk '{ print $2 }'`
+echo "Found moocbt version $moocbt_ver"
 echo "Building for kernel version $inst_kern"
 
 echo "Removing module..."
-dkms remove -m dattobd -v $dattobd_ver --all
+dkms remove -m moocbt -v $moocbt_ver --all
 
 echo "Re-adding module..."
-dkms add -m dattobd -v $dattobd_ver
+dkms add -m moocbt -v $moocbt_ver
 
 echo "Building..."
-dkms build -m dattobd -v $dattobd_ver -k $inst_kern
+dkms build -m moocbt -v $moocbt_ver -k $inst_kern
 
 echo "Installing..."
-dkms install -m dattobd -v $dattobd_ver -k $inst_kern
+dkms install -m moocbt -v $moocbt_ver -k $inst_kern

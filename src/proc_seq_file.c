@@ -1,5 +1,5 @@
 #include "cow_manager.h"
-#include "dattobd.h"
+#include "moocbt.h"
 #include "includes.h"
 #include "ioctl_handlers.h"
 #include "module_control.h"
@@ -7,36 +7,36 @@
 #include "tracer_helper.h"
 #include "proc_seq_file.h"
 
-static void *dattobd_proc_start(struct seq_file *m, loff_t *pos);
-static void *dattobd_proc_next(struct seq_file *m, void *v, loff_t *pos);
-static void dattobd_proc_stop(struct seq_file *m, void *v);
-static int dattobd_proc_show(struct seq_file *m, void *v);
-static int dattobd_proc_open(struct inode *inode, struct file *filp);
-static int dattobd_proc_release(struct inode *inode, struct file *file);
+static void *moocbt_proc_start(struct seq_file *m, loff_t *pos);
+static void *moocbt_proc_next(struct seq_file *m, void *v, loff_t *pos);
+static void moocbt_proc_stop(struct seq_file *m, void *v);
+static int moocbt_proc_show(struct seq_file *m, void *v);
+static int moocbt_proc_open(struct inode *inode, struct file *filp);
+static int moocbt_proc_release(struct inode *inode, struct file *file);
 
 #ifndef HAVE_PROC_OPS
 //#if LINUX_VERSION_CODE < KERNEL_VERSION(5,6,0)
-static const struct file_operations dattobd_proc_fops = {
+static const struct file_operations moocbt_proc_fops = {
         .owner = THIS_MODULE,
-        .open = dattobd_proc_open,
+        .open = moocbt_proc_open,
         .read = seq_read,
         .llseek = seq_lseek,
-        .release = dattobd_proc_release,
+        .release = moocbt_proc_release,
 };
 #else
-static const struct proc_ops dattobd_proc_fops = {
-        .proc_open = dattobd_proc_open,
+static const struct proc_ops moocbt_proc_fops = {
+        .proc_open = moocbt_proc_open,
         .proc_read = seq_read,
         .proc_lseek = seq_lseek,
-        .proc_release = dattobd_proc_release,
+        .proc_release = moocbt_proc_release,
 };
 #endif
 
-static const struct seq_operations dattobd_seq_proc_ops = {
-        .start = dattobd_proc_start,
-        .next = dattobd_proc_next,
-        .stop = dattobd_proc_stop,
-        .show = dattobd_proc_show,
+static const struct seq_operations moocbt_seq_proc_ops = {
+        .start = moocbt_proc_start,
+        .next = moocbt_proc_next,
+        .stop = moocbt_proc_stop,
+        .show = moocbt_proc_show,
 };
 
 #ifndef HAVE_PROC_OPS
@@ -49,7 +49,7 @@ static const struct seq_operations dattobd_seq_proc_ops = {
  */
 const struct file_operations* get_proc_fops(void)
 {
-        return &dattobd_proc_fops;
+        return &moocbt_proc_fops;
 }
 
 #else // HAVE_PROC_OPS
@@ -62,7 +62,7 @@ const struct file_operations* get_proc_fops(void)
  */
 const struct proc_ops* get_proc_fops(void)
 {
-        return &dattobd_proc_fops;
+        return &moocbt_proc_fops;
 }
 
 #endif // HAVE_PROC_OPS
@@ -70,14 +70,14 @@ const struct proc_ops* get_proc_fops(void)
 static snap_device_array current_snap_devices = NULL;
 
 /**
- * dattobd_proc_get_idx() - Turns offset into pointer into @snap_devices array.
+ * moocbt_proc_get_idx() - Turns offset into pointer into @snap_devices array.
  * @pos: An offset into the array of @snap_devices.
  *
  * Return:
  * * NULL - invalid @pos supplied, indicates "past end of file."
  * * !NULL - a void* pointer into the @snap_devices array.
  */
-static void *dattobd_proc_get_idx(loff_t pos)
+static void *moocbt_proc_get_idx(loff_t pos)
 {
         if (pos > highest_minor)
                 return NULL;
@@ -85,7 +85,7 @@ static void *dattobd_proc_get_idx(loff_t pos)
 }
 
 /**
- * dattobd_proc_start() - Prepares to iterate through the @snap_devices array.
+ * moocbt_proc_start() - Prepares to iterate through the @snap_devices array.
  *
  * @m: Pointer to a seq_file structure.
  * @pos: the previous offset from the last iteration session.
@@ -95,7 +95,7 @@ static void *dattobd_proc_get_idx(loff_t pos)
  * * SEQ_START_TOKEN - A new iteration from the start so print a header first.
  * * otherwise - Pointer into @snap_devices at offset @pos.
  */
-static void *dattobd_proc_start(struct seq_file *m, loff_t *pos)
+static void *moocbt_proc_start(struct seq_file *m, loff_t *pos)
 {
         /*
          * Depending on how much we've printed thus far our *_stop() might
@@ -106,11 +106,11 @@ static void *dattobd_proc_start(struct seq_file *m, loff_t *pos)
         current_snap_devices = get_snap_device_array();
         if (*pos == 0)
                 return SEQ_START_TOKEN;
-        return dattobd_proc_get_idx(*pos - 1);
+        return moocbt_proc_get_idx(*pos - 1);
 }
 
 /**
- * dattobd_proc_next() - Return the next entry to *_show() and advance @pos.
+ * moocbt_proc_next() - Return the next entry to *_show() and advance @pos.
  *
  * @m: The sequence file structure.
  * @v: The value last returned from *_start() or *_next()
@@ -122,14 +122,14 @@ static void *dattobd_proc_start(struct seq_file *m, loff_t *pos)
  * * NULL - @pos does not represent a valid entry in @snap_devices.
  * * otherwise - A pointer to the entry to *_show().
  */
-static void *dattobd_proc_next(struct seq_file *m, void *v, loff_t *pos)
+static void *moocbt_proc_next(struct seq_file *m, void *v, loff_t *pos)
 {
-        void *dev = dattobd_proc_get_idx(*pos);
+        void *dev = moocbt_proc_get_idx(*pos);
         ++*pos;
         return dev;
 }
 
-/** dattobd_proc_stop() - Always called at the end of iterating through the
+/** moocbt_proc_stop() - Always called at the end of iterating through the
  *                        @snap_devices array.
  * @m: The sequence file structure.
  * @v: The value last returned from *_start() or *_next()
@@ -137,13 +137,13 @@ static void *dattobd_proc_next(struct seq_file *m, void *v, loff_t *pos)
  * The end of iterating through the array is identified by a NULL return
  * value from either *_start() or *_next().
  */
-static void dattobd_proc_stop(struct seq_file *m, void *v)
+static void moocbt_proc_stop(struct seq_file *m, void *v)
 {
         put_snap_device_array(current_snap_devices);
         current_snap_devices = NULL;
 }
 
-/** dattobd_proc_show() - Outputs information about a @snap_device.  Optionally
+/** moocbt_proc_show() - Outputs information about a @snap_device.  Optionally
  *                        adds header and/or footer.
  * @m: The seq_file structure.
  * @v: The entry supplied from the last call to either *_start() or *_next().
@@ -151,7 +151,7 @@ static void dattobd_proc_stop(struct seq_file *m, void *v)
  * Return:
  * Always indicates success with a zero value.
  */
-static int dattobd_proc_show(struct seq_file *m, void *v)
+static int moocbt_proc_show(struct seq_file *m, void *v)
 {
         struct snap_device **dev_ptr = v;
         struct snap_device *dev = NULL;
@@ -159,7 +159,7 @@ static int dattobd_proc_show(struct seq_file *m, void *v)
         // print the header if the "pointer" really an indication to do so
         if (dev_ptr == SEQ_START_TOKEN) {
                 seq_printf(m, "{\n");
-                seq_printf(m, "\t\"version\": \"%s\",\n", DATTOBD_VERSION);
+                seq_printf(m, "\t\"version\": \"%s\",\n", MOOCBT_VERSION);
                 seq_printf(m, "\t\"devices\": [\n");
         }
 
@@ -179,7 +179,7 @@ static int dattobd_proc_show(struct seq_file *m, void *v)
                 seq_printf(m, "\t\t\t\"max_cache\": %lu,\n",
                            (dev->sd_cache_size) ?
                                    dev->sd_cache_size :
-                                   dattobd_cow_max_memory_default);
+                                   moocbt_cow_max_memory_default);
 
                 if (!test_bit(UNVERIFIED, &dev->sd_state)) {
                         seq_printf(m, "\t\t\t\"fallocate\": %llu,\n",
@@ -243,13 +243,13 @@ static int dattobd_proc_show(struct seq_file *m, void *v)
         return 0;
 }
 
-static int dattobd_proc_open(struct inode *inode, struct file *filp)
+static int moocbt_proc_open(struct inode *inode, struct file *filp)
 {
         mutex_lock(&ioctl_mutex);
-        return seq_open(filp, &dattobd_seq_proc_ops);
+        return seq_open(filp, &moocbt_seq_proc_ops);
 }
 
-static int dattobd_proc_release(struct inode *inode, struct file *file)
+static int moocbt_proc_release(struct inode *inode, struct file *file)
 {
         seq_release(inode, file);
         mutex_unlock(&ioctl_mutex);

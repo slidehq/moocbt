@@ -2,6 +2,7 @@
 
 /*
  * Copyright (C) 2022 Datto Inc.
+ * Additional contributions by Slide are Copyright (C) 2026 Project Orca Inc.
  */
 
 #ifndef TRACER_H_
@@ -11,7 +12,7 @@
 #include "snap_device.h"
 
 struct request_queue;
-struct dattobd_info;
+struct moocbt_info;
 struct snap_device;
 struct bio;
 
@@ -39,7 +40,7 @@ int tracer_setup_active_snap(struct snap_device *dev, unsigned int minor,
 int __tracer_setup_unverified(struct snap_device *dev, unsigned int minor,
                               const char *bdev_path, const char *cow_path,
                               unsigned long cache_size, int is_snap, snap_device_array_mut snap_devices);
-void dattobd_free_request_tracking_ptr(struct snap_device *dev);
+void moocbt_free_request_tracking_ptr(struct snap_device *dev);
 
 /************************IOCTL TRANSITION FUNCTIONS************************/
 
@@ -50,8 +51,8 @@ int tracer_active_inc_to_snap(struct snap_device *old_dev, const char *cow_path,
 
 void tracer_reconfigure(struct snap_device *dev, unsigned long cache_size);
 
-void tracer_dattobd_info(const struct snap_device *dev,
-                         struct dattobd_info *info);
+void tracer_moocbt_info(const struct snap_device *dev,
+                         struct moocbt_info *info);
 
 int tracer_expand_cow_file_no_check(struct snap_device *dev, uint64_t size);
 
