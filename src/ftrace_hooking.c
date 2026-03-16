@@ -10,7 +10,14 @@ static inline bool moocbt_within_module(unsigned long addr, const struct module 
         #endif
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,9,0)
+#ifndef CONFIG_X86_KERNEL_IBT
+#define CONFIG_X86_KERNEL_IBT 0
+#endif
+
+#if CONFIG_X86_KERNEL_IBT
+        // define nothing, disabling (u)mount hooks
+        #pragma message "disabling mount hooks, ibt present"
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(5,9,0)
         #define USE_PATH_MOUNT
         #define USE_PATH_UMOUNT
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(5,5,0)
