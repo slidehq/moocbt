@@ -29,5 +29,6 @@
 #include <linux/rwsem.h>
 #include <linux/statfs.h>
 #include <linux/string.h>
+#include <linux/fprobe.h>
 
 #endif

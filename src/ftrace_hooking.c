@@ -10,13 +10,9 @@ static inline bool moocbt_within_module(unsigned long addr, const struct module 
         #endif
 }
 
-#ifndef CONFIG_X86_KERNEL_IBT
-#define CONFIG_X86_KERNEL_IBT 0
-#endif
-
-#if CONFIG_X86_KERNEL_IBT
-        // define nothing, disabling (u)mount hooks
-        #pragma message "disabling mount hooks, ibt present"
+#ifdef HAVE_FPROBE
+        #define USE_PATH_MOUNT_FPROBE
+        #define USE_PATH_UMOUNT_FPROBE
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(5,9,0)
         #define USE_PATH_MOUNT
         #define USE_PATH_UMOUNT
@@ -33,6 +29,92 @@ static inline bool moocbt_within_module(unsigned long addr, const struct module 
         #define USE_SYS_OLDUMOUNT
 #endif //HAVE_SYS_OLDUMOUNT
 #endif //LINUX_VERSION_CODE
+
+#ifdef HAVE_FPROBE
+#include <linux/fprobe.h>
+#include <linux/ftrace_regs.h>
+#endif // HAVE_FPROBE
+
+#ifdef USE_PATH_MOUNT_FPROBE
+#define PATH_MOUNT_POST_HOOK_HANDLE_NOOP 1
+#define PATH_MOUNT_POST_HOOK_HANDLE_UMOUNT 2
+#define PATH_MOUNT_POST_HOOK_HANDLE_RW_MOUNT 3
+
+struct path_mount_ctx {
+    char *buf;
+    char *dir_name;
+    int ret;
+    unsigned int idx;
+    struct path *path;
+    int post_hook_op;
+};
+
+static int fprobe_path_mount_entry(struct fprobe *fp, unsigned long entry_ip, unsigned long ret_ip, struct ftrace_regs *regs, void *entry_data) {
+        struct path_mount_ctx *ctx = entry_data;
+
+        struct path *path = (struct path *)ftrace_regs_get_argument(regs, 1);
+        unsigned long flags = (unsigned long)ftrace_regs_get_argument(regs, 3);
+        unsigned long real_flags = flags;
+
+        memset(ctx, 0, sizeof(*ctx));
+        ctx->path = path;
+        ctx->buf = kmalloc(PATH_MAX, GFP_KERNEL);
+        if (!ctx->buf) {
+                return -ENOMEM;
+        }
+
+        // get rid of the magic value if its present
+        if ((real_flags & MS_MGC_MSK) == MS_MGC_VAL) {
+                real_flags &= ~MS_MGC_MSK;
+        }
+
+        if (real_flags & (MS_BIND | MS_SHARED | MS_PRIVATE | MS_SLAVE | MS_UNBINDABLE | MS_MOVE) ||
+                        ((real_flags & MS_RDONLY) && !(real_flags & MS_REMOUNT))) {
+                // bind, shared, move, or new read-only mounts it do not affect the state of the driver
+                ctx->post_hook_op = PATH_MOUNT_POST_HOOK_HANDLE_NOOP;
+        } else if ((real_flags & MS_RDONLY) && (real_flags & MS_REMOUNT)) {
+                // we are remounting read-only, same as umounting as far as the driver is concerned
+                ctx->post_hook_op = PATH_MOUNT_POST_HOOK_HANDLE_UMOUNT;
+                ctx->dir_name = d_path(path, ctx->buf, PATH_MAX);
+                ctx->ret = handle_bdev_mount_nowrite(ctx->dir_name, 0, &ctx->idx);
+        } else {
+                // new read-write mount
+                ctx->post_hook_op = PATH_MOUNT_POST_HOOK_HANDLE_RW_MOUNT;
+        }
+        return 0;
+}
+
+static void fprobe_path_mount_exit(struct fprobe *fp, unsigned long entry_ip, unsigned long ret_ip, struct ftrace_regs *regs, void *entry_data) {
+        struct path_mount_ctx *ctx = entry_data;
+        int sys_ret = ftrace_regs_get_return_value(regs);
+        switch (ctx->post_hook_op) {
+        case PATH_MOUNT_POST_HOOK_HANDLE_NOOP:
+                break;
+        case PATH_MOUNT_POST_HOOK_HANDLE_UMOUNT:
+                post_umount_check(ctx->ret, sys_ret, ctx->idx, ctx->dir_name);
+                break;
+        case PATH_MOUNT_POST_HOOK_HANDLE_RW_MOUNT:
+                if (!sys_ret) {
+                        ctx->dir_name = d_path(ctx->path, ctx->buf, PATH_MAX);
+                        handle_bdev_mounted_writable(ctx->dir_name, &ctx->idx);
+                }
+                break;
+        default:
+                break;
+        }
+        if (ctx->buf) {
+            kfree(ctx->buf);
+        }
+        return;
+}
+
+static struct fprobe fprobe_path_mount = {
+    .entry_data_size = sizeof(struct path_mount_ctx),
+    .entry_handler   = fprobe_path_mount_entry,
+    .exit_handler    = fprobe_path_mount_exit,
+};
+
+#endif // USE_PATH_MOUNT_FPROBE
 
 #ifdef USE_PATH_MOUNT
 static int (*orig_path_mount)(const char *dev_name, struct path *path,
@@ -210,6 +292,58 @@ static asmlinkage long ftrace_sys_mount(char __user *dev_name, char __user *dir_
 }
 #endif //USE_SYS_MOUNT
 
+
+#ifdef USE_PATH_UMOUNT_FPROBE
+
+struct path_umount_ctx {
+    char *buf;
+    int ret;
+    unsigned int idx;
+    struct path *path;
+};
+
+static int fprobe_path_umount_entry(struct fprobe *fp, unsigned long entry_ip, unsigned long ret_ip, struct ftrace_regs *regs, void *entry_data) {
+        struct path_umount_ctx *ctx = entry_data;
+
+        struct path *path = (struct path *)ftrace_regs_get_argument(regs, 0);
+        unsigned long flags = (unsigned long)ftrace_regs_get_argument(regs, 1);
+        unsigned long real_flags = flags;
+
+        memset(ctx, 0, sizeof(*ctx));
+        ctx->path = path;
+        ctx->buf = kmalloc(PATH_MAX, GFP_KERNEL);
+        if (!ctx->buf) {
+                return ENOMEM;
+        }
+        // get rid of the magic value if its present
+        if ((real_flags & MS_MGC_MSK) == MS_MGC_VAL) {
+                real_flags &= ~MS_MGC_MSK;
+        }
+
+        char* dir_name = d_path(path, ctx->buf, PATH_MAX);
+        ctx->ret = handle_bdev_mount_nowrite(dir_name, real_flags, &ctx->idx);
+        return 0;
+}
+
+static void fprobe_path_umount_exit(struct fprobe *fp, unsigned long entry_ip, unsigned long ret_ip, struct ftrace_regs *regs, void *entry_data) {
+        struct path_umount_ctx *ctx = entry_data;
+        int sys_ret = ftrace_regs_get_return_value(regs);
+
+        char* dir_name = d_path(ctx->path, ctx->buf, PATH_MAX);
+        post_umount_check(ctx->ret, sys_ret, ctx->idx, dir_name);
+        if (ctx->buf) {
+                kfree(ctx->buf);
+        }
+}
+
+static struct fprobe fprobe_path_umount = {
+    .entry_data_size = sizeof(struct path_umount_ctx),
+    .entry_handler   = fprobe_path_umount_entry,
+    .exit_handler    = fprobe_path_umount_exit,
+};
+
+#endif // USE_PATH_UMOUNT_FPROBE
+
 #ifdef USE_PATH_UMOUNT
 static int (*orig_path_umount)(struct path *path, int flags);
 
@@ -331,6 +465,30 @@ static struct ftrace_hook ftrace_hooks[] = {
         HOOK("sys_oldumount", ftrace_sys_oldumount, &orig_sys_oldumount),
 #endif //USE_SYS_OLDUMOUNT
 };
+
+#ifdef HAVE_FPROBE
+struct fprobe_hook {
+    const char *filter;
+    const char *notfilter;
+    struct fprobe *fprobe;
+};
+
+#define FPROBE_HOOK(_filter, _notfilter, _fprobe) \
+    {                                             \
+        .filter = (_filter),                      \
+        .notfilter = (_notfilter),                \
+        .fprobe = (_fprobe),                      \
+    }
+
+static struct fprobe_hook fprobe_hooks[] = {
+#ifdef USE_PATH_MOUNT_FPROBE
+        FPROBE_HOOK("path_mount", NULL, &fprobe_path_mount),
+#endif //USE_PATH_MOUNT_FPROBE
+#ifdef USE_PATH_UMOUNT_FPROBE
+        FPROBE_HOOK("path_umount", NULL, &fprobe_path_umount),
+#endif //USE_PATH_UMOUNT_FPROBE
+};
+#endif // HAVE_FPROBE
 
 // Needs CONFIG_KPROBES=y as well as CONFIG_KALLSYMS=y
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5,7,0)
@@ -460,6 +618,27 @@ static int unregister_hook(struct ftrace_hook *hook)
         return ret;
 }
 
+#ifdef HAVE_FPROBE
+static int register_fprobe_hooks(void) {
+    int ret = 0;
+    int i;
+    int count = ARRAY_SIZE(fprobe_hooks);
+
+    for (i = 0; i < count; i++) {
+        ret = register_fprobe(fprobe_hooks[i].fprobe, fprobe_hooks[i].filter, fprobe_hooks[i].notfilter);
+        if (ret) {
+            goto error;
+        }
+    }
+    return ret;
+error:
+    while (i != 0) {
+        unregister_fprobe(fprobe_hooks[--i].fprobe);
+    }
+    return ret;
+}
+#endif // HAVE_FPROBE
+
 int register_ftrace_hooks(void)
 {
 	int ret = 0;
@@ -472,13 +651,32 @@ int register_ftrace_hooks(void)
 			goto error;
 	}
 
-	return 0;
+	#ifdef HAVE_FPROBE
+	ret = register_fprobe_hooks();
+	if (ret) {
+        goto error;
+	}
+    #endif // HAVE_FPROBE
+	return ret;
 error:
 	while (i != 0) {
 		unregister_hook(&ftrace_hooks[--i]);
 	}
 	return ret;
 }
+
+#ifdef HAVE_FPROBE
+static int unregister_fprobe_hooks(void) {
+    int ret = 0;
+    int i;
+    int count = ARRAY_SIZE(fprobe_hooks);
+
+    for (i = 0; i < count; i++) {
+        unregister_fprobe(fprobe_hooks[i].fprobe);
+    }
+    return ret;
+}
+#endif // HAVE_FPROBE
 
 int unregister_ftrace_hooks(void)
 {
@@ -490,5 +688,8 @@ int unregister_ftrace_hooks(void)
 		unregister_hook(&ftrace_hooks[i]);
 	}
 
+	#ifdef HAVE_FPROBE
+	unregister_fprobe_hooks();
+	#endif // HAVE_FPROBE
 	return ret;
 }
