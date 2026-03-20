@@ -16,21 +16,31 @@
 
 #ifdef USE_BDOPS_SUBMIT_BIO
 
+#ifdef USE_FENTRY_OFFSET
 /*
  * For ftrace to work, each function has a preamble that calls a "function" (asm
  * snippet) called __fentry__ which then triggers the callbacks. If we want to
  * recurse without triggering ftrace, we'll need to skip this preamble. Don't
  * worry, the stack pointer manipulation is right after the call.
  */
-blk_qc_t (*moocbt_submit_bio_noacct_passthrough)(struct bio *) =
-	(blk_qc_t(*)(struct bio *))((unsigned long)(submit_bio_noacct) +
+MRF_RETURN_TYPE (*moocbt_submit_bio_noacct_passthrough)(struct bio *) =
+	(MRF_RETURN_TYPE(*)(struct bio *))((unsigned long)(submit_bio_noacct) +
         FENTRY_CALL_INSTR_BYTES);
+#else
+typeof(submit_bio_noacct) *moocbt_submit_bio_noacct_passthrough = submit_bio_noacct;
+#endif
 
-int moocbt_submit_bio_real(
+MRF_RETURN_TYPE moocbt_submit_bio_real(
     struct snap_device* dev,
     struct bio *bio)
 {
-    return moocbt_submit_bio_noacct_passthrough(bio);
+    #ifdef HAVE_MAKE_REQUEST_FN_INT
+    int ret = moocbt_submit_bio_noacct_passthrough(bio);
+    MRF_RETURN(ret);
+    #else
+    moocbt_submit_bio_noacct_passthrough(bio);
+    MRF_RETURN(0);
+    #endif
 }
 
 #endif

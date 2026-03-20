@@ -33,7 +33,7 @@ typedef MRF_RETURN_TYPE (submit_bio_fn) (struct bio *bio);
  * * 0 - success
  * * !0 - error
  */
-int moocbt_submit_bio_real(
+MRF_RETURN_TYPE moocbt_submit_bio_real(
     struct snap_device* dev,
     struct bio *bio
 );
