@@ -341,7 +341,7 @@ sed -e "s:@prefix@:%{_prefix}:g" \
 mkdir -p %{buildroot}/%{libname}/DEBIAN
 
 # Ubuntu 24.04 LTS have broken dpkg-gensymbols usage without debian/control file. So, let us emulate it.
-%if 0%{?ubuntu} && 0%{?ubuntu} >= 2404
+%if 0%{?ubuntu} >= 2404 || 0%{?debian} >= 13
 mkdir debian
 touch debian/control
 %endif
