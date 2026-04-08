@@ -421,6 +421,19 @@ install -m 644 dist/shutdown/umount-rootfs.service    %{buildroot}%{_systemd_ser
 
 # Get rid of git artifacts
 find %{buildroot} -name "*.git*" -print0 | xargs -0 rm -rfv
+
+%pre -n %{dkmsname}
+
+if [ -f "/boot/config-$(uname -r)" ]; then
+    if grep -q "CONFIG_X86_KERNEL_IBT=y" "/boot/config-$(uname -r)" && grep -q "\bibt\b" /proc/cpuinfo; then
+        echo "------------------------------------------------------------------------" >&2
+        echo "ERROR: MooCBT installation aborted." >&2
+        echo "Your Kernel and CPU are currently incompatible with this driver version." >&2
+        echo "------------------------------------------------------------------------" >&2
+        exit 1
+    fi
+fi
+
 %preun -n %{dkmsname}
 
 %if "%{_vendor}" == "debbuild"
