@@ -66,6 +66,11 @@
 %global _buildshell /bin/bash
 %endif
 
+# Set deb builds to use xz compression
+%if "%{_vendor}" == "debbuild"
+%global __dpkg_deb %{__dpkg_deb} -Zxz
+%endif
+
 # Set up the correct DKMS module name, per Debian convention for Debian/Ubuntu,
 # and use the other name, per convention on all other distros.
 %if "%{_vendor}" == "debbuild"
@@ -136,7 +141,7 @@
 
 
 Name:            moocbt
-Version:         0.12.1
+Version:         0.12.2
 Release:         1%{?dist}
 Summary:         Kernel module and utilities for enabling low-level live backups
 Vendor:          Project Orca Inc.
@@ -654,6 +659,13 @@ rm %{_systemd_shutdown}/umount_rootfs.shutdown
 rm %{_systemd_services}/umount-rootfs.service
 
 %changelog
+* Tue Apr 21 2026 Dakota Williams <dakota@slide.tech> - 0.12.2
+- Initial moocbt
+- Prevent install on IBT-enabled configurations
+- XZ compression for deb package builds
+- Small fix for trixie builds
+- Kbuild fix for configure tests
+
 * Wed May 14 2025 Andrii Fylypiuk <andrii.fylypiuk@datto.com> - 0.12.1
 - Fixed warnings related to DKMS
 - Fixed build errors on SLE 15 SP5 and SP6
