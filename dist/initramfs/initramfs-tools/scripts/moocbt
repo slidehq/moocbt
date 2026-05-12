@@ -44,9 +44,15 @@ if [ -n "$rbd" ]; then
     # Kernel cmdline might not specify rootfstype
     [ -z "$ROOTFSTYPE" ] && ROOTFSTYPE=$(blkid -s TYPE -o value $rbd)
 
-    echo "moocbt: mounting $rbd as $ROOTFSTYPE" > /dev/kmsg
+    mount_opts="ro"
+    # Avoid replaying a dirty journal when mounting ro.
+    if [ "$ROOTFSTYPE" = "ext3" ] || [ "$ROOTFSTYPE" = "ext4" ]; then
+        mount_opts="$mount_opts,noload"
+    fi
+
+    echo "moocbt: mounting $rbd as $ROOTFSTYPE ($mount_opts)" > /dev/kmsg
     blockdev --setro $rbd
-    mount -t $ROOTFSTYPE -o ro $rbd /etc/moocbt/mnt > /dev/kmsg
+    mount -t $ROOTFSTYPE -o $mount_opts $rbd /etc/moocbt/mnt > /dev/kmsg
     udevadm settle
 
     if [ -x /sbin/moo_reload ]; then
