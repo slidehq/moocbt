@@ -38,8 +38,16 @@
 
 # All sane distributions use dracut now, so here are dracut paths for it
 %if 0%{?rhel} > 0 && 0%{?rhel} < 7
+
+%echo moocbt: dracut path = RHEL < 7 branch (%{_datadir}/dracut/modules.d)
+
+
 %global _dracut_modules_root %{_datadir}/dracut/modules.d
 %else
+
+%echo moocbt: dracut path = default branch (%{_prefix}/lib/dracut/modules.d)
+
+
 %global _dracut_modules_root %{_prefix}/lib/dracut/modules.d
 %endif
 
