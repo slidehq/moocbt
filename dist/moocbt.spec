@@ -6,9 +6,6 @@
 # Location to install kernel module sources
 %global _kmod_src_root %{_usrsrc}/%{name}-%{version}
 
-%{echo:moocbt: debug ubuntu macro = "%{?ubuntu}", debian macro = "%{?debian}"}
-
-
 # Location for systemd shutdown script
 # "%%{_vendor}" == "redhat" covers rhel, centos and fedora 
 # Ubuntu18 doesn't have /usr/lib/systemd/, but Ubuntu20 has both locations with the same content
@@ -41,17 +38,12 @@
 
 # All sane distributions use dracut now, so here are dracut paths for it
 %if 0%{?rhel} > 0 && 0%{?rhel} < 7
-
-%{echo:moocbt: dracut path = RHEL lt 7 branch (%{_datadir}/dracut/modules.d)}
-
-
 %global _dracut_modules_root %{_datadir}/dracut/modules.d
 %else
-
-%{echo:moocbt: dracut path = default branch (%{_prefix}/lib/dracut/modules.d)}
-
 %global _dracut_modules_root %{_prefix}/lib/dracut/modules.d
 %endif
+
+%{echo:moocbt: _vendor = "%{_vendor}", rhel macro = "%{?rhel}", suse_version macro = "%{?suse_version}", ubuntu macro = "%{?ubuntu}", debian macro = "%{?debian}", _modules_load_root = "%{_modules_load_root}", _dracut_modules_root = "%{_dracut_modules_root}"}
 
 # RHEL 5 and openSUSE 13.1 and older use mkinitrd instead of dracut
 %if 0%{?rhel} == 5 || 0%{?suse_version} > 0 && 0%{?suse_version} < 1315
@@ -412,17 +404,11 @@ install -m 755 dist/initramfs/reload %{buildroot}%{_sharedstatedir}/moocbt/reloa
 # Debian/Ubuntu use initramfs-tools
 %if 0%{?debian} || 0%{?ubuntu}
 %if 0%{?ubuntu} >= 2604
-
-%{echo:moocbt: initramfs branch = dracut (ubuntu >= 2604)}
-
 mkdir -p %{buildroot}%{_dracut_modules_root}/90moocbt
 install -m 755 dist/initramfs/dracut/moocbt.sh %{buildroot}%{_dracut_modules_root}/90moocbt/moocbt.sh
 install -m 755 dist/initramfs/dracut/module-setup.sh %{buildroot}%{_dracut_modules_root}/90moocbt/module-setup.sh
 install -m 755 dist/initramfs/dracut/install %{buildroot}%{_dracut_modules_root}/90moocbt/install
 %else
-
-%{echo:moocbt: initramfs branch = not dracut (ubuntu lt 2604)}
-
 mkdir -p %{buildroot}%{_initramfs_tools_root}
 mkdir -p %{buildroot}%{_initramfs_tools_root}/hooks
 mkdir -p %{buildroot}%{_initramfs_tools_root}/scripts/init-premount
