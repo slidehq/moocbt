@@ -143,7 +143,7 @@
 
 
 Name:            moocbt
-Version:         0.12.3
+Version:         0.12.4
 Release:         1%{?dist}
 Summary:         Kernel module and utilities for enabling low-level live backups
 Vendor:          Project Orca Inc.
@@ -679,6 +679,9 @@ rm %{_systemd_shutdown}/umount_rootfs.shutdown
 rm %{_systemd_services}/umount-rootfs.service
 
 %changelog
+* Tue Jun 16 2026 Stu <stu@slide.tech> - 0.12.4
+- Add dracut initramfs module support for Ubuntu 26.04
+
 * Tue May 5 2026 Dakota Williams <dakota@slide.tech> - 0.12.3
 - Update package owned directories to include reload script path
 
