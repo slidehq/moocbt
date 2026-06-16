@@ -6,6 +6,9 @@
 # Location to install kernel module sources
 %global _kmod_src_root %{_usrsrc}/%{name}-%{version}
 
+%{echo:DEBUG: ubuntu macro = "%{?ubuntu}", debian macro = "%{?debian}"}
+
+
 # Location for systemd shutdown script
 # "%%{_vendor}" == "redhat" covers rhel, centos and fedora 
 # Ubuntu18 doesn't have /usr/lib/systemd/, but Ubuntu20 has both locations with the same content
