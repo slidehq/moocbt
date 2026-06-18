@@ -410,7 +410,6 @@ mkdir -p %{buildroot}%{_initramfs_tools_root}/hooks
 mkdir -p %{buildroot}%{_initramfs_tools_root}/scripts/init-premount
 install -m 755 dist/initramfs/initramfs-tools/hooks/moocbt %{buildroot}%{_initramfs_tools_root}/hooks/moocbt
 install -m 755 dist/initramfs/initramfs-tools/scripts/moocbt %{buildroot}%{_initramfs_tools_root}/scripts/init-premount/moocbt
-%endif
 %else
 # openSUSE 13.1 and older use mkinitrd
 %if 0%{?suse_version} > 0 && 0%{?suse_version} < 1315
