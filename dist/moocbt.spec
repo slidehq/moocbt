@@ -43,13 +43,15 @@
 %global _dracut_modules_root %{_prefix}/lib/dracut/modules.d
 %endif
 
+%{echo:moocbt: _vendor = "%{_vendor}", rhel macro = "%{?rhel}", suse_version macro = "%{?suse_version}", ubuntu macro = "%{?ubuntu}", debian macro = "%{?debian}", _modules_load_root = "%{_modules_load_root}", _dracut_modules_root = "%{_dracut_modules_root}"}
+
 # RHEL 5 and openSUSE 13.1 and older use mkinitrd instead of dracut
 %if 0%{?rhel} == 5 || 0%{?suse_version} > 0 && 0%{?suse_version} < 1315
 %global _mkinitrd_scripts_root /lib/mkinitrd/scripts
 %endif
 
-# Debian and Ubuntu use initramfs-tools instead of dracut.. for now
-%if 0%{?debian} || 0%{?ubuntu}
+# Debian and Ubuntu before 26.04 use initramfs-tools instead of dracut.
+%if 0%{?debian} || ! (0%{?ubuntu} >= 2604)
 %global _initramfs_tools_root %{_datadir}/initramfs-tools
 %endif
 
@@ -141,7 +143,7 @@
 
 
 Name:            moocbt
-Version:         0.12.3
+Version:         0.12.4
 Release:         1%{?dist}
 Summary:         Kernel module and utilities for enabling low-level live backups
 Vendor:          Project Orca Inc.
@@ -396,11 +398,13 @@ install -m 755 dist/kernel.postinst.d/50-moocbt %{buildroot}%{_sysconfdir}/kerne
 %if 0%{?rhel} != 5
 
 # Install initramfs stuff
+%if ! (0%{?ubuntu} >= 2604)
 mkdir -p %{buildroot}%{_sharedstatedir}/moocbt
 install -m 755 dist/initramfs/reload %{buildroot}%{_sharedstatedir}/moocbt/reload
+%endif
 
 # Debian/Ubuntu use initramfs-tools
-%if 0%{?debian} || 0%{?ubuntu}
+%if 0%{?debian} || ! (0%{?ubuntu} >= 2604)
 mkdir -p %{buildroot}%{_initramfs_tools_root}
 mkdir -p %{buildroot}%{_initramfs_tools_root}/hooks
 mkdir -p %{buildroot}%{_initramfs_tools_root}/scripts/init-premount
@@ -483,7 +487,7 @@ fi
 
 %post utils
 %if 0%{?rhel} != 5
-# Generate initramfs
+# Generate initramfs, this will select dracut for ubuntu 26.04
 if type "dracut" &> /dev/null; then
     echo "Configuring dracut, please wait..."
     dracut -f || :
@@ -546,7 +550,7 @@ rm -rf %{buildroot}
 %if 0%{?rhel} != 5
 %dir %{_sharedstatedir}/moocbt
 %{_sharedstatedir}/moocbt/reload
-%if 0%{?debian} || 0%{?ubuntu}
+%if 0%{?debian} || ! (0%{?ubuntu} >= 2604)
 %{_initramfs_tools_root}/hooks/moocbt
 %{_initramfs_tools_root}/scripts/init-premount/moocbt
 %else
@@ -663,6 +667,9 @@ rm %{_systemd_shutdown}/umount_rootfs.shutdown
 rm %{_systemd_services}/umount-rootfs.service
 
 %changelog
+* Tue Jun 16 2026 Stu <stu@slide.tech> - 0.12.4
+- Add dracut initramfs module support for Ubuntu 26.04
+
 * Tue May 5 2026 Dakota Williams <dakota@slide.tech> - 0.12.3
 - Update package owned directories to include reload script path
 
