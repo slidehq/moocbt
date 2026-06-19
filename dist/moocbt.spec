@@ -51,7 +51,7 @@
 %endif
 
 # Debian and Ubuntu before 26.04 use initramfs-tools instead of dracut.
-%if 0%{?debian} || 0%{?ubuntu} < 2604
+%if 0%{?debian} || ! (0%{?ubuntu} >= 2604)
 %global _initramfs_tools_root %{_datadir}/initramfs-tools
 %endif
 
@@ -404,7 +404,7 @@ install -m 755 dist/initramfs/reload %{buildroot}%{_sharedstatedir}/moocbt/reloa
 %endif
 
 # Debian/Ubuntu use initramfs-tools
-%if 0%{?debian} || 0%{?ubuntu} < 2604
+%if 0%{?debian} || ! (0%{?ubuntu} >= 2604)
 mkdir -p %{buildroot}%{_initramfs_tools_root}
 mkdir -p %{buildroot}%{_initramfs_tools_root}/hooks
 mkdir -p %{buildroot}%{_initramfs_tools_root}/scripts/init-premount
@@ -550,7 +550,7 @@ rm -rf %{buildroot}
 %if 0%{?rhel} != 5
 %dir %{_sharedstatedir}/moocbt
 %{_sharedstatedir}/moocbt/reload
-%if 0%{?debian} || 0%{?ubuntu} < 2604
+%if 0%{?debian} || ! (0%{?ubuntu} >= 2604)
 %{_initramfs_tools_root}/hooks/moocbt
 %{_initramfs_tools_root}/scripts/init-premount/moocbt
 %else
