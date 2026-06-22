@@ -243,6 +243,8 @@ Requires:        %{libname}%{?_isa} = %{version}-%{release}
 Recommends:      bash-completion
 %endif
 
+Conflicts:      dattobd-utils
+
 %description utils
 Utilities for %{name} to use the kernel module.
 
@@ -284,8 +286,11 @@ Requires:        perl
 # Dependencies for actually building the kmod
 Requires:        make
 
-%if "%{_vendor}" != "debbuild"
+%if "%{_vendor}" == "debbuild"
+Conflicts: dattobd-dkms
+%else
 %if 0%{?rhel} >= 6 || 0%{?suse_version} >= 1210 || 0%{?fedora}
+Conflicts: dkms-dattobd
 # With RPM 4.9.0 and newer, it's possible to give transaction
 # hints to ensure some kind of ordering for transactions using
 # the OrderWithRequires statement.
