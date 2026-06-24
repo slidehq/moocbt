@@ -17,8 +17,10 @@ Module.symvers
 dmesg.log
 __pycache__/
 .cache/
+venv/
 
 # Project directories
 pkgbuild/
 
 *kdev4*
+
