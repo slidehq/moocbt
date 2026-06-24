@@ -1019,69 +1019,6 @@ void moocbt_inode_unlock(struct inode *inode)
 }
 #endif
 
-static struct kmem_cache **vm_area_cache = (VM_AREA_CACHEP_ADDR != 0) ?
-	(struct kmem_cache **) (VM_AREA_CACHEP_ADDR + (long long)(((void *)kfree) - (void *)KFREE_ADDR)) : NULL;
-
-#ifdef HAVE_VM_AREA_STRUCT_VM_LOCK
-static struct kmem_cache **vma_lock_cache = (VMA_LOCK_CACHEP_ADDR != 0) ?
-	(struct kmem_cache **) (VMA_LOCK_CACHEP_ADDR + (long long)(((void *)kfree) - (void *)KFREE_ADDR)) : NULL;
-#endif
-
-struct vm_area_struct* moocbt_vm_area_allocate(struct mm_struct* mm)
-{
-        struct vm_area_struct *vma;
-        static const struct vm_operations_struct dummy_vm_ops = {};
-
-	if (!vm_area_cache) {
-		LOG_ERROR(-ENOTSUPP, "vm_area_cachep was not found");
-		return NULL;
-	}
-	vma = kmem_cache_zalloc(*vm_area_cache, GFP_KERNEL);
-	if (!vma) {
-		LOG_ERROR(-ENOMEM, "kmem_cache_zalloc() failed");
-		return NULL;
-	}
-
-#ifdef HAVE_VM_AREA_STRUCT_VM_LOCK
-        vma->vm_lock = kmem_cache_zalloc(*vma_lock_cache, GFP_KERNEL);
-        if (!vma->vm_lock) {
-                LOG_ERROR(-ENOMEM, "kmem_cache_zalloc() failed");
-                kmem_cache_free(*vm_area_cache, vma);
-                return NULL;
-        }
-        init_rwsem(&vma->vm_lock->lock);
-        vma->vm_lock_seq = -1;
-#endif
-
-	vma->vm_mm = mm;
-	vma->vm_ops = &dummy_vm_ops;
-	INIT_LIST_HEAD(&vma->anon_vma_chain);
-	return vma;
-}
-
-void moocbt_vm_area_free(struct vm_area_struct *vma)
-{
-        kmem_cache_free(*vm_area_cache, vma);
-}
-
-void moocbt_mm_lock(struct mm_struct* mm)
-{
-#ifdef HAVE_MMAP_WRITE_LOCK
-	mmap_write_lock(mm);
-#else
-	down_write(&mm->mmap_sem);
-#endif
-}
-
-void moocbt_mm_unlock(struct mm_struct* mm)
-{
-#ifdef HAVE_MMAP_WRITE_LOCK
-	mmap_write_unlock(mm);
-#else
-	up_write(&mm->mmap_sem);
-#endif
-}
-
 // removed file_switch_lock as it is managed by the moocbt_mutable_file
 // void file_switch_lock(struct file* filp, bool lock, bool mark_dirty)
 // {

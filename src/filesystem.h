@@ -142,14 +142,6 @@ void moocbt_inode_unlock(struct inode *inode);
 #define moocbt_inode_unlock inode_unlock
 #endif
 
-struct vm_area_struct* moocbt_vm_area_allocate(struct mm_struct* mm);
-
-void moocbt_vm_area_free(struct vm_area_struct *vma);
-
-void moocbt_mm_lock(struct mm_struct* mm);
-
-void moocbt_mm_unlock(struct mm_struct* mm);
-
 int file_write_block(struct snap_device* dev, const void* block, size_t offset, size_t len);
 
 int file_read_block(struct snap_device* dev, void* block, size_t offset, size_t len);
