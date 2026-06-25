@@ -243,6 +243,8 @@ Requires:        %{libname}%{?_isa} = %{version}-%{release}
 Recommends:      bash-completion
 %endif
 
+Conflicts:      dattobd-utils
+
 %description utils
 Utilities for %{name} to use the kernel module.
 
@@ -284,8 +286,11 @@ Requires:        perl
 # Dependencies for actually building the kmod
 Requires:        make
 
-%if "%{_vendor}" != "debbuild"
+%if "%{_vendor}" == "debbuild"
+Conflicts: dattobd-dkms
+%else
 %if 0%{?rhel} >= 6 || 0%{?suse_version} >= 1210 || 0%{?fedora}
+Conflicts: dkms-dattobd
 # With RPM 4.9.0 and newer, it's possible to give transaction
 # hints to ensure some kind of ordering for transactions using
 # the OrderWithRequires statement.
@@ -427,9 +432,9 @@ install -m 755 dist/initramfs/dracut/install %{buildroot}%{_dracut_modules_root}
 
 # Install systemd shutdown script
 mkdir -p %{buildroot}%{_systemd_shutdown}
-install -m 755 dist/shutdown/umount_rootfs.shutdown %{buildroot}%{_systemd_shutdown}/
+install -m 755 dist/shutdown/moocbt_umount_rootfs.shutdown %{buildroot}%{_systemd_shutdown}/
 mkdir -p %{buildroot}%{_systemd_services}
-install -m 644 dist/shutdown/umount-rootfs.service    %{buildroot}%{_systemd_services}/umount-rootfs.service
+install -m 644 dist/shutdown/moocbt-umount-rootfs.service    %{buildroot}%{_systemd_services}/moocbt-umount-rootfs.service
 
 # Get rid of git artifacts
 find %{buildroot} -name "*.git*" -print0 | xargs -0 rm -rfv
@@ -528,7 +533,7 @@ fi
 if [ ! -d %{_systemd_services}/reboot.target.wants/ ]; then
    mkdir -p %{_systemd_services}/reboot.target.wants
 fi   
-ln -fs %{_systemd_services}/umount-rootfs.service   %{_systemd_services}/reboot.target.wants/umount-rootfs.service 
+ln -fs %{_systemd_services}/moocbt-umount-rootfs.service   %{_systemd_services}/reboot.target.wants/moocbt-umount-rootfs.service 
 
 %postun -n %{libname}
 /sbin/ldconfig
@@ -567,12 +572,12 @@ rm -rf %{buildroot}
 %endif
 
 # Install systemd shutdown script
-%{_systemd_shutdown}/umount_rootfs.shutdown
-%{_systemd_services}/umount-rootfs.service
+%{_systemd_shutdown}/moocbt_umount_rootfs.shutdown
+%{_systemd_services}/moocbt-umount-rootfs.service
 
 
 %post 
-ln -fs %{_systemd_services}/umount-rootfs.service   %{_systemd_services}/reboot.target.wants/umount-rootfs.service 
+ln -fs %{_systemd_services}/moocbt-umount-rootfs.service   %{_systemd_services}/reboot.target.wants/moocbt-umount-rootfs.service 
 
 %doc README.md doc/STRUCTURE.md
 %if "%{_vendor}" == "redhat"
@@ -658,13 +663,13 @@ ln -fs %{_systemd_services}/umount-rootfs.service   %{_systemd_services}/reboot.
 %endif
 
 %preun 
-systemctl stop umount-rootfs.service
-systemctl disable umount-rootfs.service
+systemctl stop moocbt-umount-rootfs.service
+systemctl disable moocbt-umount-rootfs.service
 
 %postun 
-unlink  %{_systemd_services}/reboot.target.wants/umount-rootfs.service 
-rm %{_systemd_shutdown}/umount_rootfs.shutdown
-rm %{_systemd_services}/umount-rootfs.service
+unlink  %{_systemd_services}/reboot.target.wants/moocbt-umount-rootfs.service 
+rm %{_systemd_shutdown}/moocbt_umount_rootfs.shutdown
+rm %{_systemd_services}/moocbt-umount-rootfs.service
 
 %changelog
 * Tue Jun 16 2026 Stu <stu@slide.tech> - 0.12.4

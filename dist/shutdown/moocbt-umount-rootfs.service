@@ -8,7 +8,7 @@ After=final.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/lib/systemd/system-shutdown/umount_rootfs.shutdown  
+ExecStart=/usr/lib/systemd/system-shutdown/moocbt_umount_rootfs.shutdown  
 
 [Install]
 WantedBy=halt.target reboot.target shutdown.target final.target
