@@ -10,8 +10,8 @@
 #include "logging.h"
 #include "tracer.h"
 #include "blkdev.h"
-#include "memory.h"
 
+#include <linux/mman.h>
 #ifdef HAVE_UUID_H
 #include <linux/uuid.h>
 #endif
@@ -1088,134 +1088,85 @@ int cow_read_data(struct cow_manager *cm, void *buf, uint64_t block_pos,
 
 int cow_get_file_extents(struct snap_device* dev, struct file* filp)
 {
-	int ret;
-	struct fiemap_extent_info fiemap_info;
-	unsigned int fiemap_mapped_extents_size, i_ext;
-	struct fiemap_extent *extent;
-	char parent_process_name[TASK_COMM_LEN];
-	unsigned long vm_flags = VM_READ | VM_WRITE;
-	unsigned long start_addr;
-	struct task_struct *task;
-	struct vm_area_struct *vma;
-	struct page *pg;
-	__user uint8_t *cow_ext_buf;
+    int ret;
+    struct fiemap_extent_info fiemap_info;
+    struct inode *inode = filp->f_inode;
+    unsigned long cow_ext_buf_size = ALIGN(moocbt_cow_ext_buf_size, PAGE_SIZE);
+    unsigned int max_num_extents = cow_ext_buf_size / sizeof(struct fiemap_extent);
 
-        unsigned long cow_ext_buf_size = ALIGN(moocbt_cow_ext_buf_size, PAGE_SIZE);
+    LOG_DEBUG("getting cow file extents from filp=%p", filp);
 
-        int (*fiemap)(struct inode *, struct fiemap_extent_info *, u64 start, u64 len);
+    // vm_mmap needs a real user address space to map into
+    if (!current->mm) {
+        LOG_ERROR(-EINVAL, "no user mm to map fiemap buffer into");
+        return -EINVAL;
+    }
 
-        int (*insert_vm_struct)(struct mm_struct *mm, struct vm_area_struct *vma) = (INSERT_VM_STRUCT_ADDR != 0) ?
-        (int (*)(struct mm_struct *mm, struct vm_area_struct *vma)) (INSERT_VM_STRUCT_ADDR + (long long)(((void *)kfree) - (void *)KFREE_ADDR)) : NULL;
+    if (!inode->i_op || !inode->i_op->fiemap) {
+        LOG_ERROR(-EOPNOTSUPP, "fiemap not supported for cow file");
+        return -EOPNOTSUPP;
+    }
 
-        	if (!insert_vm_struct) {
-		LOG_ERROR(-ENOTSUPP, "insert_vm_struct() was not found");
-		return -ENOTSUPP;
-	}
+    // fiemap copies extents out with copy_to_user(), so it requires an
+    // actual userspace buffer. Map an anonymous region in the calling process
+    // for the buffer.
+    unsigned long cow_ext_buf = vm_mmap(NULL, 0, cow_ext_buf_size,
+            PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0);
+    if (IS_ERR_VALUE(cow_ext_buf)) {
+        ret = (int)cow_ext_buf;
+        LOG_ERROR(ret, "failed to map buffer for fiemap");
+        return ret;
+    }
 
-        fiemap = NULL;
-	task = get_current();
+    fiemap_info.fi_flags = FIEMAP_FLAG_SYNC;
+    fiemap_info.fi_extents_mapped = 0;
+    fiemap_info.fi_extents_max = max_num_extents;
+    fiemap_info.fi_extents_start = (struct fiemap_extent __user *)cow_ext_buf;
 
-        LOG_DEBUG("getting cow file extents from filp=%p", filp);
-	LOG_DEBUG("attempting page stealing from %s", get_task_comm(parent_process_name, task));
+    ret = inode->i_op->fiemap(inode, &fiemap_info, 0, FIEMAP_MAX_OFFSET);
+    if (ret) {
+        LOG_ERROR(ret, "fiemap call failed");
+        goto out;
+    }
 
-        moocbt_mm_lock(task->mm);
-        start_addr = moocbt_get_unmapped_area(NULL, 0, cow_ext_buf_size, 0, VM_READ | VM_WRITE);
+    LOG_DEBUG("fiemap for cow file: extents %u (max %u)",
+            fiemap_info.fi_extents_mapped, fiemap_info.fi_extents_max);
 
-        if (IS_ERR_VALUE(start_addr))
-		return start_addr; // returns -EPERM if failed
+    if (fiemap_info.fi_extents_mapped > 0) {
+        unsigned int cnt = fiemap_info.fi_extents_mapped;
+        size_t extents_size = cnt * sizeof(struct fiemap_extent);
+        struct fiemap_extent *extents = kmalloc(extents_size, GFP_KERNEL);
 
+        if (!extents) {
+            ret = -ENOMEM;
+            LOG_ERROR(ret, "failed to allocate kernelspace extent buffer");
+            goto out;
+        }
 
-        vma = moocbt_vm_area_allocate(task->mm);
+        if (copy_from_user(extents, (void __user *)cow_ext_buf, extents_size)) {
+            kfree(extents);
+            ret = -EFAULT;
+            LOG_ERROR(ret, "failed to copy cow file extents from userspace");
+            goto out;
+        }
 
-	if (!vma) {
-		ret = -ENOMEM;
-		LOG_ERROR(ret, "vm_area_alloc() failed");
-		moocbt_mm_unlock(task->mm);
-		return ret;
-	}
+        if (dev->sd_cow_extents) {
+            kfree(dev->sd_cow_extents);
+        }
+        dev->sd_cow_extents = extents;
+        dev->sd_cow_ext_cnt = cnt;
+        WARN(cnt == max_num_extents, "max num of extents read, increase cow_ext_buf_size");
 
-        vma->vm_start = start_addr;
-	vma->vm_end = start_addr + cow_ext_buf_size;
-	*(unsigned long *) &vma->vm_flags = vm_flags;
-	vma->vm_page_prot = vm_get_page_prot(vm_flags);
-	vma->vm_pgoff = 0;
-
-        ret = insert_vm_struct(task->mm, vma);
-        if (ret < 0) {
-		LOG_ERROR(ret, "insert_vm_struct() failed");
-		moocbt_vm_area_free(vma);
-		moocbt_mm_unlock(task->mm);
-		return ret;
-	}
-
-        pg = alloc_pages(GFP_USER, get_order(cow_ext_buf_size));
-	if (!pg) {
-		LOG_ERROR(ret, "alloc_page() failed");
-		moocbt_vm_area_free(vma);
-		moocbt_mm_unlock(task->mm);
-		return ret;
-	}
-
-        SetPageReserved(pg);
-	ret = remap_pfn_range(vma, vma->vm_start, page_to_pfn(pg), cow_ext_buf_size, PAGE_SHARED);
-	if (ret < 0) {
-		LOG_ERROR(ret, "remap_pfn_range() failed");
-		ClearPageReserved(pg);
-		__free_pages(pg, get_order(cow_ext_buf_size));
-		moocbt_vm_area_free(vma);
-		moocbt_mm_unlock(task->mm);
-		return ret;
-	}
-
-        cow_ext_buf = (__user uint8_t *) start_addr;
-
-	if (filp->f_inode->i_op)
-		fiemap = filp->f_inode->i_op->fiemap;
-
-        if (fiemap) {
-		int64_t fiemap_max = ~0ULL & ~(1ULL << 63);
-		int max_num_extents = cow_ext_buf_size; // used for do_div() as it overwrites the first argument
-
-		fiemap_info.fi_flags = FIEMAP_FLAG_SYNC;
-		fiemap_info.fi_extents_mapped = 0;
-		do_div(max_num_extents, sizeof(struct fiemap_extent));
-		fiemap_info.fi_extents_max = max_num_extents;
-		fiemap_info.fi_extents_start = (struct fiemap_extent __user *)cow_ext_buf;
-
-		ret = fiemap(filp->f_inode, &fiemap_info, 0, fiemap_max);
-
-		LOG_DEBUG("fiemap for cow file (ret %d), extents %u (max %u)", ret,
-				fiemap_info.fi_extents_mapped, fiemap_info.fi_extents_max);
-
-		if (!ret && fiemap_info.fi_extents_mapped > 0) {
-			if (dev->sd_cow_extents) kfree(dev->sd_cow_extents);
-			fiemap_mapped_extents_size = fiemap_info.fi_extents_mapped * sizeof(struct fiemap_extent);
-			dev->sd_cow_extents = kmalloc(fiemap_mapped_extents_size, GFP_KERNEL);
-			if (dev->sd_cow_extents) {
-                                //TODO: closely watch
-				ret = copy_from_user(dev->sd_cow_extents, cow_ext_buf, fiemap_mapped_extents_size);
-				if (!ret) {
-					dev->sd_cow_ext_cnt = fiemap_info.fi_extents_mapped;
-					WARN(dev->sd_cow_ext_cnt == max_num_extents, "max num of extents read, increase cow_ext_buf_size");
-					extent = dev->sd_cow_extents;
-					for (i_ext = 0; i_ext < fiemap_info.fi_extents_mapped; ++i_ext, ++extent) {
-						LOG_DEBUG("   cow file extent: log 0x%llx, phy 0x%llx, len %llu", extent->fe_logical, extent->fe_physical, extent->fe_length);
-					}
-				}
-			}
-		}
-	} else {
-		ret = -ENOTSUPP;
-		LOG_ERROR(ret, "fiemap not supported");
-		goto out;
-	}
+        for (unsigned int i = 0; i < cnt; ++i) {
+            LOG_DEBUG("   cow file extent: log 0x%llx, phy 0x%llx, len %llu",
+                    extents[i].fe_logical, extents[i].fe_physical,
+                    extents[i].fe_length);
+        }
+    }
 
 out:
-	ClearPageReserved(pg);
-	moocbt_mm_unlock(task->mm);
-	vm_munmap(vma->vm_start, cow_ext_buf_size);
-	__free_pages(pg, get_order(cow_ext_buf_size));
-	return ret;
+    vm_munmap(cow_ext_buf, cow_ext_buf_size);
+    return ret;
 }
 
 
