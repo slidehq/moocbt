@@ -54,6 +54,4 @@ void moocbt_drop_super(struct super_block *sb);
 void moocbt_blkdev_put(struct bdev_wrapper *bd);
 
 int moocbt_get_start_sect_by_gendisk_for_bio(struct gendisk* gd, u8 partno, sector_t* result);
-
-int moocbt_get_kstatfs(struct block_device* bd, struct kstatfs* statfs);
 #endif /* BLKDEV_H_ */

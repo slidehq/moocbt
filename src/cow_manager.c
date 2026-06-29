@@ -32,12 +32,12 @@
 
 const unsigned long moocbt_cow_ext_buf_size = sizeof(struct fiemap_extent) * 1024;
 
-inline void __close_and_destroy_moocbt_mutable_file(struct moocbt_mutable_file *dfilp){
+inline void __close_and_destroy_moocbt_cow_file(struct moocbt_cow_file *dfilp){
         file_close(dfilp);
-        moocbt_mutable_file_unwrap(dfilp);
+        moocbt_cow_file_unwrap(dfilp);
 }
 
-inline int __open_moocbt_mutable_file(const char *path, int flags, struct moocbt_mutable_file **dfilp){
+inline int __open_moocbt_cow_file(const char *path, int flags, struct moocbt_cow_file **dfilp){
         struct file* filp = NULL;
         int ret;
 
@@ -48,7 +48,7 @@ inline int __open_moocbt_mutable_file(const char *path, int flags, struct moocbt
                 return ret;
         }
 
-        *dfilp = moocbt_mutable_file_wrap(filp);
+        *dfilp = moocbt_cow_file_wrap(filp);
 
         if(IS_ERR(*dfilp)){
                 LOG_ERROR(-ENOMEM, "failed to wrap file pointer");
@@ -422,7 +422,7 @@ void cow_free_members(struct cow_manager *cm)
 
         if (cm->dfilp) {
                 file_unlink(cm->dfilp);
-                __close_and_destroy_moocbt_mutable_file(cm->dfilp);
+                __close_and_destroy_moocbt_cow_file(cm->dfilp);
                 cm->dfilp = NULL;
         }
 }
@@ -462,7 +462,7 @@ int cow_sync_and_free(struct cow_manager *cm)
                 goto error;
 
         if (cm->dfilp){
-                __close_and_destroy_moocbt_mutable_file(cm->dfilp);
+                __close_and_destroy_moocbt_cow_file(cm->dfilp);
                 cm->dfilp = NULL;
         }
 
@@ -510,7 +510,7 @@ int cow_sync_and_close(struct cow_manager *cm)
 	if(ret) goto error;
 
         if (cm->dfilp){
-                __close_and_destroy_moocbt_mutable_file(cm->dfilp);
+                __close_and_destroy_moocbt_cow_file(cm->dfilp);
                 cm->dfilp = NULL;
         }
 
@@ -537,7 +537,7 @@ int cow_reopen(struct cow_manager *cm, const char *pathname)
         int ret;
 
         LOG_DEBUG("reopening cow file");
-        ret = __open_moocbt_mutable_file(pathname, 0, &cm->dfilp);
+        ret = __open_moocbt_cow_file(pathname, 0, &cm->dfilp);
         if (ret)
                 goto error;
 
@@ -551,7 +551,7 @@ int cow_reopen(struct cow_manager *cm, const char *pathname)
 error:
         LOG_ERROR(ret, "error reopening cow manager");
         if (cm->dfilp){
-                __close_and_destroy_moocbt_mutable_file(cm->dfilp);
+                __close_and_destroy_moocbt_cow_file(cm->dfilp);
                 cm->dfilp = NULL;
         }
 
@@ -616,7 +616,7 @@ int cow_reload(const char *path, uint64_t elements, unsigned long sect_size,
         }
 
         LOG_DEBUG("opening cow file");
-        ret = __open_moocbt_mutable_file(path, 0, &cm->dfilp);
+        ret = __open_moocbt_cow_file(path, 0, &cm->dfilp);
         if (ret)
                 goto error;
 
@@ -628,7 +628,6 @@ int cow_reload(const char *path, uint64_t elements, unsigned long sect_size,
         cm->allowed_sects =
                 __cow_calculate_allowed_sects(cache_size, cm->total_sects);
         cm->data_offset = COW_HEADER_SIZE + (cm->total_sects * (sect_size * sizeof(uint64_t)));
-        cm->auto_expand = NULL;
 
         ret = __cow_open_header(cm, index_only, 1);
         if (ret)
@@ -661,7 +660,7 @@ int cow_reload(const char *path, uint64_t elements, unsigned long sect_size,
 error:
         LOG_ERROR(ret, "error during cow manager initialization");
         if (cm->dfilp){
-                __close_and_destroy_moocbt_mutable_file(cm->dfilp);
+                __close_and_destroy_moocbt_cow_file(cm->dfilp);
                 cm->dfilp = NULL;
         }
 
@@ -715,7 +714,7 @@ int cow_init(struct snap_device *dev, const char *path, uint64_t elements, unsig
         }
 
         LOG_DEBUG("creating cow file");
-        ret = __open_moocbt_mutable_file(path, O_CREAT | O_TRUNC, &cm->dfilp);
+        ret = __open_moocbt_cow_file(path, O_CREAT | O_TRUNC, &cm->dfilp);
         if (ret)
                 goto error;
 
@@ -737,7 +736,6 @@ int cow_init(struct snap_device *dev, const char *path, uint64_t elements, unsig
         cm->data_offset = COW_HEADER_SIZE + (cm->total_sects * (sect_size * 8)); // data offset in bytes, equals 4096 + [total_sects*4096*8](index size)
         cm->curr_pos = cm->data_offset / COW_BLOCK_SIZE;
         cm->dev = dev;
-        cm->auto_expand = NULL;
 
         if (uuid)
                 memcpy(cm->uuid, uuid, COW_UUID_SIZE);
@@ -778,7 +776,7 @@ error:
         LOG_ERROR(ret, "error during cow manager initialization");
         if (cm->dfilp){
                 file_unlink(cm->dfilp);
-                __close_and_destroy_moocbt_mutable_file(cm->dfilp);
+                __close_and_destroy_moocbt_cow_file(cm->dfilp);
                 cm->dfilp = NULL;
         }
 
@@ -951,36 +949,8 @@ static int __cow_write_data(struct cow_manager *cm, void *buf)
         char *abs_path = NULL;
         int abs_path_len;
         uint64_t curr_size = cm->curr_pos * COW_BLOCK_SIZE;
-        uint64_t expand_allowance = 0;
-        int kstatfs_ret;
-        struct kstatfs kstatfs;
 
-retry:
         if (curr_size >= cm->file_size) {
-                // try expansion of cow_file
-                if(cm->auto_expand){
-                        kstatfs_ret = 0;
-                        if(cm->dev && cm->dev->sd_base_dev){
-                                kstatfs_ret = moocbt_get_kstatfs(cm->dev->sd_base_dev->bdev, &kstatfs);
-                        }
-
-                        if(!kstatfs_ret){
-                                expand_allowance = cow_auto_expand_manager_get_allowance(cm->auto_expand, kstatfs.f_bavail, (uint64_t) kstatfs.f_bsize);
-                        }else{
-                                LOG_WARN("failed to get kstatfs with error code %d, expansion allowance is given only if reserved space is 0.", kstatfs_ret);
-                                expand_allowance = cow_auto_expand_manager_get_allowance_free_unknown(cm->auto_expand);
-                        }
-
-                        if(expand_allowance){
-                                ret = tracer_expand_cow_file_no_check(cm->dev, expand_allowance);
-                                expand_allowance = 0;
-                                if(ret)
-                                        goto error;
-                                goto retry;
-                        }
-                }
-
-
                 ret = -EFBIG;
 
                 file_get_absolute_pathname(cm->dfilp, &abs_path, &abs_path_len);
@@ -1216,111 +1186,4 @@ out:
 	vm_munmap(vma->vm_start, cow_ext_buf_size);
 	__free_pages(pg, get_order(cow_ext_buf_size));
 	return ret;
-}
-
-
-int __cow_expand_datastore(struct cow_manager* cm, uint64_t append_size_bytes){
-        int ret;
-        uint64_t actual = 0;
-
-        LOG_DEBUG("trying to expand cow file with %llu bytes", append_size_bytes);
-
-        ret = file_allocate(cm->dfilp, cm->dev, cm->file_size, append_size_bytes, &actual);
-
-        if(actual != append_size_bytes){
-                LOG_WARN("cow file was not expanded to requested size (req: %llu, act: %llu)", append_size_bytes, actual);
-        }
-
-        cm->file_size = cm->file_size + actual;
-
-        if (ret){
-                LOG_ERROR(ret, "unable to expand cow file");
-                return ret;
-        }
-
-        return 0;
-}
-
-struct cow_auto_expand_manager* cow_auto_expand_manager_init(void){
-        struct cow_auto_expand_manager* aem = kzalloc(sizeof(struct cow_auto_expand_manager), GFP_KERNEL);
-        if(!aem){
-                LOG_ERROR(-ENOMEM, "error allocating cow auto expand manager");
-                return ERR_PTR(-ENOMEM);
-        }
-
-        mutex_init(&aem->lock);
-
-        return aem;
-}
-
-int cow_auto_expand_manager_reconfigure(struct cow_auto_expand_manager* aem, uint64_t step_size_mib, uint64_t reserved_space_mib){
-        mutex_lock(&aem->lock);
-        aem->step_size_mib = step_size_mib;
-        aem->reserved_space_mib = reserved_space_mib;
-        mutex_unlock(&aem->lock);
-        return 0;
-}
-
-/*
-* cow_auto_expand_manager_get_allowance() - Tests if the auto expand manager has steps remaining regarding to the available blocks and block size.
-*
-* @aem: The &struct cow_auto_expand_manager.
-* @available_blocks: The number of available blocks on the block device. (from kstatfs, f_bavail)
-* @block_size: The size of a block on the block device. (from kstatfs, f_bsize)
-*
-* Return:
-* 0 - no steps remaining
-* !0 - size to expand the cow file by
-*/
-uint64_t cow_auto_expand_manager_get_allowance(struct cow_auto_expand_manager* aem, uint64_t available_blocks, uint64_t block_size_bytes){
-        #define ceil(a, b) (((a)+(b)-1)/(b))
-        #define mib_to_bytes(a) ((a)*1024*1024)
-        
-        uint64_t ret;
-
-        ret = 0;
-        mutex_lock(&aem->lock);
-        if(aem->step_size_mib && ceil(mib_to_bytes(aem->step_size_mib + aem->reserved_space_mib), block_size_bytes) <= available_blocks){
-                ret = mib_to_bytes(aem->step_size_mib);
-        }else{
-                if(aem->step_size_mib){
-                        LOG_WARN("rejected auto-expand: %llu MiB step size, %llu MiB reserved space, %llu blocks available, %llu B block size",
-                                aem->step_size_mib, aem->reserved_space_mib, available_blocks, block_size_bytes);
-                }
-        }
-        mutex_unlock(&aem->lock);
-
-        return ret;
-}
-
-/*
-* cow_auto_expand_manager_get_allowance_free_unknown() - Tests if the auto expand manager has steps remaining if the free space is not available.
-* Allows to make an auto-expand if the reserved space is 0.
-*
-* @aem: The &struct cow_auto_expand_manager.
-*
-* Return:
-* 0 - no steps remaining
-* !0 - size to expand the cow file by
-*/
-uint64_t cow_auto_expand_manager_get_allowance_free_unknown(struct cow_auto_expand_manager* aem){
-        #define mib_to_bytes(a) ((a)*1024*1024)
-        
-        uint64_t ret;
-
-        ret = 0;
-        mutex_lock(&aem->lock);
-        // We allow COW-File Auto-Expansion when free space is unknown only for cases where reserved space is 0
-        if(aem->step_size_mib && aem->reserved_space_mib == 0){
-                ret = mib_to_bytes(aem->step_size_mib);
-        }
-        mutex_unlock(&aem->lock);
-
-        return ret;
-}
-
-
-void cow_auto_expand_manager_free(struct cow_auto_expand_manager* aem){
-        mutex_destroy(&aem->lock);
-        kfree(aem);
 }
