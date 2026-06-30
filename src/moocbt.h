@@ -16,7 +16,7 @@
 #include <linux/limits.h>
 #include <linux/types.h>
 
-#define MOOCBT_VERSION "0.12.1"
+#define MOOCBT_VERSION "0.12.4"
 #define MOOCBT_IOCTL_MAGIC 0x91
 
 struct setup_params {
