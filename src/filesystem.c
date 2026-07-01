@@ -47,7 +47,7 @@ static int kern_path(const char *name, unsigned int flags, struct path *path)
  *
  * Return: The number of bytes read or a negative errno.
  */
-static ssize_t moocbt_kernel_read(struct moocbt_mutable_file *dfilp, struct snap_device* dev, void *buf, size_t count,
+static ssize_t moocbt_kernel_read(struct moocbt_cow_file *dfilp, struct snap_device* dev, void *buf, size_t count,
                                    loff_t *pos)
 {
         ssize_t ret;
@@ -57,7 +57,7 @@ static ssize_t moocbt_kernel_read(struct moocbt_mutable_file *dfilp, struct snap
 
         if(dfilp){
                 // no need for making file mutable at read?
-                moocbt_mutable_file_unlock(dfilp);
+                moocbt_cow_file_unlock(dfilp);
 #ifndef HAVE_KERNEL_READ_PPOS
                 //#if LINUX_VERSION_CODE < KERNEL_VERSION(4,14,0)
                 old_fs = get_fs();
@@ -68,7 +68,7 @@ static ssize_t moocbt_kernel_read(struct moocbt_mutable_file *dfilp, struct snap
 #else
                 ret=kernel_read(dfilp->filp, buf, count, pos);
 #endif
-                moocbt_mutable_file_lock(dfilp);
+                moocbt_cow_file_lock(dfilp);
                 return ret;
         }else{
 		LOG_DEBUG("DIO: reading %lu sectors...", count / SECTOR_SIZE);
@@ -91,7 +91,7 @@ static ssize_t moocbt_kernel_read(struct moocbt_mutable_file *dfilp, struct snap
  *
  * Return: The number of bytes written or a negative errno.
  */
-static ssize_t moocbt_kernel_write(struct moocbt_mutable_file *dfilp, struct snap_device* dev, const void *buf,
+static ssize_t moocbt_kernel_write(struct moocbt_cow_file *dfilp, struct snap_device* dev, const void *buf,
                                     size_t count, loff_t *pos)
 {
         ssize_t ret;
@@ -100,7 +100,7 @@ static ssize_t moocbt_kernel_write(struct moocbt_mutable_file *dfilp, struct sna
 #endif
 
         if(dfilp){
-                moocbt_mutable_file_unlock(dfilp);
+                moocbt_cow_file_unlock(dfilp);
 #ifndef HAVE_KERNEL_WRITE_PPOS
                 //#if LINUX_VERSION_CODE < KERNEL_VERSION(4,14,0)
 
@@ -111,7 +111,7 @@ static ssize_t moocbt_kernel_write(struct moocbt_mutable_file *dfilp, struct sna
 #else
                 ret = kernel_write(dfilp->filp, buf, count, pos);
 #endif
-                moocbt_mutable_file_lock(dfilp);
+                moocbt_cow_file_lock(dfilp);
                 return ret;
         }else{
 		LOG_DEBUG("DIO: writing %lu sectors...", count / SECTOR_SIZE);
@@ -138,7 +138,7 @@ static ssize_t moocbt_kernel_write(struct moocbt_mutable_file *dfilp, struct sna
  * * 0 - success
  * * !0 - errno indicating the error
  */
-int file_io(struct moocbt_mutable_file *dfilp, struct snap_device* dev, int is_write, void *buf, sector_t offset,
+int file_io(struct moocbt_cow_file *dfilp, struct snap_device* dev, int is_write, void *buf, sector_t offset,
             unsigned long len, unsigned long *done)
 {
         ssize_t ret;
@@ -174,14 +174,14 @@ int file_io(struct moocbt_mutable_file *dfilp, struct snap_device* dev, int is_w
         return ret;
 }
 
-inline void file_close(struct moocbt_mutable_file *dfilp){
-        // force closing moocbt_mutable_file
+inline void file_close(struct moocbt_cow_file *dfilp){
+        // force closing moocbt_cow_file
         if(unlikely(!dfilp))
                 return;
         if(atomic_read(&dfilp->writers) > 0){
                 LOG_WARN("closing file that is still unlocked");
         }
-        moocbt_mutable_file_unlock(dfilp);
+        moocbt_cow_file_unlock(dfilp);
         __file_close_raw(dfilp->filp);
 }
 
@@ -433,7 +433,7 @@ error:
  * * 0 - success
  * * !0 - errno indicating the error.
  */
-int file_get_absolute_pathname(const struct moocbt_mutable_file *dfilp, char **buf,
+int file_get_absolute_pathname(const struct moocbt_cow_file *dfilp, char **buf,
                                int *len_res)
 {
         struct path path;
@@ -651,7 +651,7 @@ static int moocbt_do_truncate(struct dentry *dentry, loff_t length,
                 newattrs.ia_valid |= ret | ATTR_FORCE;
 
         moocbt_inode_lock(dentry->d_inode);
-        // replaced with moocbt_mutable_file lock/unlock mechanism
+        // replaced with moocbt_cow_file lock/unlock mechanism
         // inode_attr_unlock(dentry->d_inode);
 #ifdef HAVE_NOTIFY_CHANGE_2
         //#if LINUX_VERSION_CODE < KERNEL_VERSION(3,13,0)
@@ -682,7 +682,7 @@ static int moocbt_do_truncate(struct dentry *dentry, loff_t length,
  * * 0 - success
  * * !0 - errno indicating the error.
  */
-int file_truncate(struct moocbt_mutable_file *dfilp, loff_t len)
+int file_truncate(struct moocbt_cow_file *dfilp, loff_t len)
 {
         struct inode *inode;
         struct dentry *dentry;
@@ -691,7 +691,7 @@ int file_truncate(struct moocbt_mutable_file *dfilp, loff_t len)
         dentry = dfilp->dentry;
         inode = dfilp->inode;
 
-        moocbt_mutable_file_unlock(dfilp);
+        moocbt_cow_file_unlock(dfilp);
 
 #ifdef HAVE_SB_START_WRITE
         //#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,6,0)
@@ -705,7 +705,7 @@ int file_truncate(struct moocbt_mutable_file *dfilp, loff_t len)
         sb_end_write(inode->i_sb);
 #endif
 
-        moocbt_mutable_file_lock(dfilp);
+        moocbt_cow_file_lock(dfilp);
 
         if (ret) {
                 LOG_ERROR(ret, "error performing truncation");
@@ -732,7 +732,7 @@ error:
  * * 0 - success
  * * !0 - errno indicating the error.
  */
-static int try_real_fallocate(struct moocbt_mutable_file *dfilp, uint64_t offset, uint64_t length)
+static int try_real_fallocate(struct moocbt_cow_file *dfilp, uint64_t offset, uint64_t length)
 {
         int ret;
         loff_t off = offset;
@@ -742,7 +742,7 @@ static int try_real_fallocate(struct moocbt_mutable_file *dfilp, uint64_t offset
         if (off + len > inode->i_sb->s_maxbytes || off + len < 0)
                 return -EFBIG;
 
-        moocbt_mutable_file_unlock(dfilp);
+        moocbt_cow_file_unlock(dfilp);
 #ifdef HAVE_SB_START_WRITE
         sb_start_write(inode->i_sb);
 #endif
@@ -766,7 +766,7 @@ static int try_real_fallocate(struct moocbt_mutable_file *dfilp, uint64_t offset
 #ifdef HAVE_SB_START_WRITE
         sb_end_write(inode->i_sb);
 #endif
-        moocbt_mutable_file_lock(dfilp);
+        moocbt_cow_file_lock(dfilp);
 
         return ret;
 }
@@ -786,7 +786,7 @@ static int try_real_fallocate(struct moocbt_mutable_file *dfilp, uint64_t offset
  * * 0 - success
  * * !0 - errno indicating the error.
  */
-int file_allocate(struct moocbt_mutable_file *dfilp, struct snap_device* dev,  uint64_t offset, uint64_t length, uint64_t *done)
+int file_allocate(struct moocbt_cow_file *dfilp, struct snap_device* dev,  uint64_t offset, uint64_t length, uint64_t *done)
 {
         int ret = 0;
         char *page_buf = NULL;
@@ -888,14 +888,14 @@ error:
  * * 0 - success
  * * !0 - errno indicating the error.
  */
-int file_unlink(struct moocbt_mutable_file *dfilp)
+int file_unlink(struct moocbt_cow_file *dfilp)
 {
         int ret = 0;
         struct inode *dir_inode = dfilp->dentry->d_parent->d_inode;
         struct dentry *file_dentry = dfilp->dentry;
         struct vfsmount *mnt = moocbt_get_mnt(dfilp->filp);
 
-        // replaced with moocbt_mutable_file lock/unlock mechanism
+        // replaced with moocbt_cow_file lock/unlock mechanism
         // if(file_dentry->d_inode && inode_attr_is_locked(file_dentry->d_inode)){
         //         inode_attr_unlock(file_dentry->d_inode);
         // }
@@ -913,7 +913,7 @@ int file_unlink(struct moocbt_mutable_file *dfilp)
                 goto mnt_error;
         }
 
-        moocbt_mutable_file_unlock(dfilp);
+        moocbt_cow_file_unlock(dfilp);
 
 #ifdef HAVE_VFS_UNLINK_2
         //#if LINUX_VERSION_CODE < KERNEL_VERSION(3,13,0)
@@ -933,7 +933,7 @@ int file_unlink(struct moocbt_mutable_file *dfilp)
 
 error:
         mnt_drop_write(mnt);
-        moocbt_mutable_file_lock(dfilp);
+        moocbt_cow_file_lock(dfilp);
 
 mnt_error:
         iput(dir_inode);
@@ -1019,7 +1019,7 @@ void moocbt_inode_unlock(struct inode *inode)
 }
 #endif
 
-// removed file_switch_lock as it is managed by the moocbt_mutable_file
+// removed file_switch_lock as it is managed by the moocbt_cow_file
 // void file_switch_lock(struct file* filp, bool lock, bool mark_dirty)
 // {
 //         struct inode* inode;
@@ -1273,8 +1273,8 @@ sector_t sector_by_offset(struct snap_device*dev, size_t offset)
 	return SECTOR_INVALID;
 }
 
-struct moocbt_mutable_file* moocbt_mutable_file_wrap(struct file* filp){
-        struct moocbt_mutable_file *dfilp = kzalloc(sizeof(struct moocbt_mutable_file), GFP_KERNEL);
+struct moocbt_cow_file* moocbt_cow_file_wrap(struct file* filp){
+        struct moocbt_cow_file *dfilp = kzalloc(sizeof(struct moocbt_cow_file), GFP_KERNEL);
         long ret;
 
         if(unlikely(!dfilp)){
@@ -1339,7 +1339,7 @@ error:
         return ERR_PTR(ret);
 }
 
-void moocbt_mutable_file_unlock(struct moocbt_mutable_file* dfilp){
+void moocbt_cow_file_unlock(struct moocbt_cow_file* dfilp){
         if(dfilp){
                 igrab(dfilp->inode);
                 dfilp->inode->i_flags &= ~S_IMMUTABLE;
@@ -1348,7 +1348,7 @@ void moocbt_mutable_file_unlock(struct moocbt_mutable_file* dfilp){
         }
 }
 
-void moocbt_mutable_file_lock(struct moocbt_mutable_file* dfilp){
+void moocbt_cow_file_lock(struct moocbt_cow_file* dfilp){
         if(dfilp){
                 if(atomic_dec_and_test(&dfilp->writers)){
                         igrab(dfilp->inode);
@@ -1358,7 +1358,7 @@ void moocbt_mutable_file_lock(struct moocbt_mutable_file* dfilp){
         }
 }
 
-void moocbt_mutable_file_unwrap(struct moocbt_mutable_file* dfilp){
+void moocbt_cow_file_unwrap(struct moocbt_cow_file* dfilp){
         if(dfilp){
                 kfree(dfilp);
         }
