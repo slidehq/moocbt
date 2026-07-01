@@ -506,9 +506,6 @@ int cow_sync_and_close(struct cow_manager *cm)
         if (ret)
                 goto error;
 
-        ret = cow_get_file_extents(cm->dev, cm->dfilp->filp);
-	if(ret) goto error;
-
         if (cm->dfilp){
                 __close_and_destroy_moocbt_cow_file(cm->dfilp);
                 cm->dfilp = NULL;
@@ -1054,87 +1051,4 @@ int cow_read_data(struct cow_manager *cm, void *buf, uint64_t block_pos,
         }
 
         return 0;
-}
-
-int cow_get_file_extents(struct snap_device* dev, struct file* filp)
-{
-    int ret;
-    struct fiemap_extent_info fiemap_info;
-    struct inode *inode = filp->f_inode;
-    unsigned long cow_ext_buf_size = ALIGN(moocbt_cow_ext_buf_size, PAGE_SIZE);
-    unsigned int max_num_extents = cow_ext_buf_size / sizeof(struct fiemap_extent);
-
-    LOG_DEBUG("getting cow file extents from filp=%p", filp);
-
-    // vm_mmap needs a real user address space to map into
-    if (!current->mm) {
-        LOG_ERROR(-EINVAL, "no user mm to map fiemap buffer into");
-        return -EINVAL;
-    }
-
-    if (!inode->i_op || !inode->i_op->fiemap) {
-        LOG_ERROR(-EOPNOTSUPP, "fiemap not supported for cow file");
-        return -EOPNOTSUPP;
-    }
-
-    // fiemap copies extents out with copy_to_user(), so it requires an
-    // actual userspace buffer. Map an anonymous region in the calling process
-    // for the buffer.
-    unsigned long cow_ext_buf = vm_mmap(NULL, 0, cow_ext_buf_size,
-            PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0);
-    if (IS_ERR_VALUE(cow_ext_buf)) {
-        ret = (int)cow_ext_buf;
-        LOG_ERROR(ret, "failed to map buffer for fiemap");
-        return ret;
-    }
-
-    fiemap_info.fi_flags = FIEMAP_FLAG_SYNC;
-    fiemap_info.fi_extents_mapped = 0;
-    fiemap_info.fi_extents_max = max_num_extents;
-    fiemap_info.fi_extents_start = (struct fiemap_extent __user *)cow_ext_buf;
-
-    ret = inode->i_op->fiemap(inode, &fiemap_info, 0, FIEMAP_MAX_OFFSET);
-    if (ret) {
-        LOG_ERROR(ret, "fiemap call failed");
-        goto out;
-    }
-
-    LOG_DEBUG("fiemap for cow file: extents %u (max %u)",
-            fiemap_info.fi_extents_mapped, fiemap_info.fi_extents_max);
-
-    if (fiemap_info.fi_extents_mapped > 0) {
-        unsigned int cnt = fiemap_info.fi_extents_mapped;
-        size_t extents_size = cnt * sizeof(struct fiemap_extent);
-        struct fiemap_extent *extents = kmalloc(extents_size, GFP_KERNEL);
-
-        if (!extents) {
-            ret = -ENOMEM;
-            LOG_ERROR(ret, "failed to allocate kernelspace extent buffer");
-            goto out;
-        }
-
-        if (copy_from_user(extents, (void __user *)cow_ext_buf, extents_size)) {
-            kfree(extents);
-            ret = -EFAULT;
-            LOG_ERROR(ret, "failed to copy cow file extents from userspace");
-            goto out;
-        }
-
-        if (dev->sd_cow_extents) {
-            kfree(dev->sd_cow_extents);
-        }
-        dev->sd_cow_extents = extents;
-        dev->sd_cow_ext_cnt = cnt;
-        WARN(cnt == max_num_extents, "max num of extents read, increase cow_ext_buf_size");
-
-        for (unsigned int i = 0; i < cnt; ++i) {
-            LOG_DEBUG("   cow file extent: log 0x%llx, phy 0x%llx, len %llu",
-                    extents[i].fe_logical, extents[i].fe_physical,
-                    extents[i].fe_length);
-        }
-    }
-
-out:
-    vm_munmap(cow_ext_buf, cow_ext_buf_size);
-    return ret;
 }

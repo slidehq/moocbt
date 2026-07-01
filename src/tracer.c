@@ -504,18 +504,8 @@ static int __tracer_destroy_cow(struct snap_device *dev, int close_method)
                 }
         }
 
-        if (close_method != 2 && dev->sd_cow_extents) {
-		LOG_DEBUG("destroying cow file extents");
-		kfree(dev->sd_cow_extents);
-		dev->sd_cow_extents = NULL;
-		dev->sd_cow_ext_cnt = 0;
-		dev->sd_cow_inode = NULL;
-	} else {
-		LOG_DEBUG("preserving cow file extents");
-	}
-
         dev->sd_falloc_size = 0;
-	dev->sd_cache_size = 0;
+        dev->sd_cache_size = 0;
 
         return ret;
 }
@@ -802,8 +792,6 @@ static void __tracer_copy_cow(const struct snap_device *src,
 {
         dest->sd_cow = src->sd_cow;
         // copy cow file extents and update the device
-        dest->sd_cow_extents = src->sd_cow_extents;
-        dest->sd_cow_ext_cnt = src->sd_cow_ext_cnt;
         dest->sd_cow_inode = src->sd_cow_inode;
         dest->sd_cow->dev = dest;
 
