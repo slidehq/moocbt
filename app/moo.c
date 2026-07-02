@@ -24,12 +24,9 @@ static void print_help(int status){
 	printf("\tmoo transition-to-incremental <minor>\n");
 	printf("\tmoo transition-to-snapshot [-f fallocate] <cow file> <minor>\n");
 	printf("\tmoo reconfigure [-c <cache size>] <minor>\n");
-	printf("\tmoo expand-cow-file <size> <minor>\n");
-	printf("\tmoo reconfigure-auto-expand [-r <reserved space>] <step size> <minor>\n");
 	printf("\tmoo help\n\n");
 	printf("<cow file> should be specified as an absolute path.\n");
 	printf("cache size should be provided in bytes, and fallocate should be provided in megabytes.\n");
-	printf("in expand-cow-file and reconfigure-auto-expand size should be provided in megabytes.\n");
 	printf("note: if the -c or -f options are not specified for any given call, module defaults are used.\n");
 	exit(status);
 }
@@ -83,33 +80,6 @@ static int parse_ui(const char *str, unsigned int *out){
 	}
 
 	*out = (unsigned int)tmp;
-	return 0;
-
-error:
-	*out = 0;
-	return -1;
-}
-
-static int parse_ui64(const char *str, uint64_t *out){
-	if(sizeof(unsigned long long) < sizeof(uint64_t)){
-		errno = EINVAL;
-		goto error;
-	}
-	
-	unsigned long long tmp;
-	const char *c = str;
-
-	//check that string is an integer number and has a length
-	do{
-		if(!isdigit(*c)) goto error;
-		c++;
-	}while(*c);
-
-	//convert to unsigned long long
-	tmp = strtoull(str, NULL, 0);
-	if(errno) goto error;
-
-	*out = (uint64_t)tmp;
 	return 0;
 
 error:
@@ -346,66 +316,6 @@ error:
 	return 0;
 }
 
-static int handle_expand_cow_file(int argc, char **argv){
-	int ret;
-	unsigned int minor;
-	uint64_t size;
-
-	if(argc != 3){
-		errno = EINVAL;
-		goto error;
-	}
-
-	ret = parse_ui64(argv[1], &size);
-	if(ret) goto error;
-
-	ret = parse_ui(argv[2], &minor);
-	if(ret) goto error;
-
-	return moocbt_expand_cow_file(minor, size);
-
-error:
-	perror("error interpreting expand parameters");
-	print_help(-1);
-	return 0;
-}
-
-static int handle_reconfigure_auto_expand(int argc, char **argv){
-	int ret, c;
-	unsigned int minor;
-	uint64_t step_size;
-	uint64_t reserved_space = 0;
-
-	//get cache size and fallocated space params, if given
-	while((c = getopt(argc, argv, "r:")) != -1){
-		switch(c){
-		case 'r':
-			ret = parse_ui64(optarg, &reserved_space);
-			if(ret) goto error;
-			break;
-		default:
-			errno = EINVAL;
-			goto error;
-		}
-	}
-
-	if(argc - optind != 2){
-		errno = EINVAL;
-		goto error;
-	}
-
-	ret = parse_ui64(argv[optind], &step_size);
-	ret = parse_ui(argv[optind+1], &minor);
-	if(ret) goto error;
-
-	return moocbt_reconfigure_auto_expand(minor, step_size, reserved_space);
-
-error:
-	perror("error interpreting reconfigure auto expand parameters");
-	print_help(-1);
-	return 0;
-}
-
 int main(int argc, char **argv){
 	int ret = 0;
 
@@ -426,8 +336,6 @@ int main(int argc, char **argv){
 	else if(!strcmp(argv[1], "transition-to-incremental")) ret = handle_transition_inc(argc - 1, argv + 1);
 	else if(!strcmp(argv[1], "transition-to-snapshot")) ret = handle_transition_snap(argc - 1, argv + 1);
 	else if(!strcmp(argv[1], "reconfigure")) ret = handle_reconfigure(argc - 1, argv + 1);
-	else if(!strcmp(argv[1], "expand-cow-file")) ret = handle_expand_cow_file(argc - 1, argv + 1);
-	else if(!strcmp(argv[1], "reconfigure-auto-expand")) ret = handle_reconfigure_auto_expand(argc - 1, argv + 1);
 	else if(!strcmp(argv[1], "help")) print_help(0);
 	else print_help(-1);
 
