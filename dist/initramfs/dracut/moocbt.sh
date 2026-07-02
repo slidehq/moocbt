@@ -36,22 +36,25 @@ if [ -n "$rbd" ]; then
     [ -z "$rootfstype" ] && rootfstype=$(blkid -s TYPE "$rbd" -o value)
 
     mount_opts="ro"
-    # Avoid replaying a dirty journal when mounting ro.
-    if [ "$rootfstype" = "ext3" ] || [ "$rootfstype" = "ext4" ]; then
-        mount_opts="$mount_opts,noload"
-    fi
+    case "$rootfstype" in
+        ext3|ext4) mount_opts="$mount_opts,noload" ;;
+        xfs)       mount_opts="$mount_opts,norecovery" ;;
+    esac
 
     echo "moocbt: mounting $rbd as $rootfstype ($mount_opts)" > /dev/kmsg
     blockdev --setro $rbd
-    mount -t $rootfstype -o $mount_opts "$rbd" /etc/moocbt/mnt > /dev/kmsg
-    udevadm settle
+    if mount -t $rootfstype -o $mount_opts "$rbd" /etc/moocbt/mnt > /dev/kmsg 2>&1; then
+        udevadm settle
 
-    if [ -x /sbin/moo_reload ]; then
-        /sbin/moo_reload
+        if [ -x /sbin/moo_reload ]; then
+            /sbin/moo_reload
+        else
+            echo "moocbt: error: cannot reload tracking data: missing /sbin/moo_reload" > /dev/kmsg
+        fi
+
+        umount -f /etc/moocbt/mnt > /dev/kmsg
     else
-        echo "moocbt: error: cannot reload tracking data: missing /sbin/moo_reload" > /dev/kmsg
+        echo "moocbt: error: failed to mount $rbd read-only ($rootfstype, $mount_opts); tracking data NOT reloaded" > /dev/kmsg
     fi
-
-    umount -f /etc/moocbt/mnt > /dev/kmsg
     blockdev --setrw $rbd
 fi
