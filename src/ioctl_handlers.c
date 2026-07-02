@@ -439,7 +439,7 @@ static int ioctl_moocbt_info(struct moocbt_info *info)
         return 0;
 
 error:
-        LOG_ERROR(ret, "error during reconfigure ioctl handler");
+        LOG_ERROR(ret, "error during moocbt info ioctl handler");
         put_snap_device_array(snap_devices);
         return ret;
 }
@@ -492,7 +492,7 @@ long ctrl_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
         unsigned int minor = 0;
         unsigned long fallocated_space = 0, cache_size = 0;
 
-        LOG_DEBUG("ioctl command received: %i", cmd);
+        LOG_DEBUG("ioctl command received: %x", cmd);
         mutex_lock(&ioctl_mutex);
 
         switch (cmd) {
