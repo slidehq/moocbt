@@ -350,14 +350,14 @@ static int bdev_is_already_traced(const struct block_device *bdev, snap_device_a
  * file_is_on_bdev() - Checks to see if the &struct moocbt mutable file object is contained
  * within the &struct block_device device.
  *
- * @dfilp: A moocbt mutable file object.
+ * @dfilp: A moocbt cow file object.
  * @bdev: the &struct block_device that might hold the @dfilp.
  *
  * Return:
  * * 0 - the @dfilp is not on the @bdev.
  * * !0 - the @dfilp is on the @bdev.
  */
-static int file_is_on_bdev(const struct moocbt_mutable_file *dfilp, struct block_device *bdev)
+static int file_is_on_bdev(const struct moocbt_cow_file *dfilp, struct block_device *bdev)
 {
         struct super_block *sb = moocbt_get_super(bdev);
         struct super_block *sb_file = dfilp->mnt->mnt_sb;
@@ -504,18 +504,8 @@ static int __tracer_destroy_cow(struct snap_device *dev, int close_method)
                 }
         }
 
-        if (close_method != 2 && dev->sd_cow_extents) {
-		LOG_DEBUG("destroying cow file extents");
-		kfree(dev->sd_cow_extents);
-		dev->sd_cow_extents = NULL;
-		dev->sd_cow_ext_cnt = 0;
-		dev->sd_cow_inode = NULL;
-	} else {
-		LOG_DEBUG("preserving cow file extents");
-	}
-
         dev->sd_falloc_size = 0;
-	dev->sd_cache_size = 0;
+        dev->sd_cache_size = 0;
 
         return ret;
 }
@@ -802,8 +792,6 @@ static void __tracer_copy_cow(const struct snap_device *src,
 {
         dest->sd_cow = src->sd_cow;
         // copy cow file extents and update the device
-        dest->sd_cow_extents = src->sd_cow_extents;
-        dest->sd_cow_ext_cnt = src->sd_cow_ext_cnt;
         dest->sd_cow_inode = src->sd_cow_inode;
         dest->sd_cow->dev = dest;
 
@@ -829,14 +817,14 @@ static void __tracer_destroy_cow_path(struct snap_device *dev)
  * __tracer_setup_cow_path() - Sets up the COW file path given a &struct file.
  *
  * @dev: The &struct snap_device object pointer.
- * @cow_dfile: A &struct moocbt_mutable_file object pointer.
+ * @cow_dfile: A &struct moocbt_cow_file object pointer.
  *
  * Return:
  * * 0 - success
  * * !0 - errno indicating the error
  */
 static int __tracer_setup_cow_path(struct snap_device *dev,
-                                   const struct moocbt_mutable_file *cow_dfile)
+                                   const struct moocbt_cow_file *cow_dfile)
 {
         int ret;
 
@@ -1991,10 +1979,6 @@ int tracer_active_snap_to_inc(struct snap_device *old_dev, snap_device_array_mut
         // thread to prevent concurrent access.
         __tracer_destroy_cow_thread(old_dev);
 
-        // disable auto-expand
-        cow_auto_expand_manager_free(old_dev->sd_cow->auto_expand);
-        old_dev->sd_cow->auto_expand = NULL;
-
         // sanity check to ensure no errors have occurred while cleaning up the
         // old cow thread
         ret = tracer_read_fail_state(old_dev);
@@ -2472,24 +2456,4 @@ error:
         if (cow_path)
                 kfree(cow_path);
         tracer_set_fail_state(dev, ret);
-}
-
-int tracer_expand_cow_file_no_check(struct snap_device *dev, uint64_t by_size_bytes){
-        int ret;
-        LOG_DEBUG("ENTER tracer_expand_cow_file_no_check");
-        if(tracer_read_fail_state(dev)){
-                LOG_ERROR(-EBUSY, "cannot expand cow file for device in error state");
-                return -EBUSY;
-        }
-
-        ret = __cow_expand_datastore(dev->sd_cow, by_size_bytes);
-
-        if(ret){
-                LOG_ERROR(ret, "error expanding cow file");
-                tracer_set_fail_state(dev, ret);
-                // __tracer_destroy_cow_thread(dev); -- we can't ask for thread destroy, as this function may be called from cow thread
-                // cow_thread must fail in a few moments
-        }
-
-        return ret;
 }

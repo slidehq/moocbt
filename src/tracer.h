@@ -54,8 +54,6 @@ void tracer_reconfigure(struct snap_device *dev, unsigned long cache_size);
 void tracer_moocbt_info(const struct snap_device *dev,
                          struct moocbt_info *info);
 
-int tracer_expand_cow_file_no_check(struct snap_device *dev, uint64_t size);
-
 /************************AUTOMATIC TRANSITION FUNCTIONS************************/
 
 void __tracer_active_to_dormant(struct snap_device *dev);

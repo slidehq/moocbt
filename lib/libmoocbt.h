@@ -30,10 +30,6 @@ int moocbt_reconfigure(unsigned int minor, unsigned long cache_size);
 
 int moocbt_info(unsigned int minor, struct moocbt_info *info);
 
-int moocbt_expand_cow_file(unsigned int minor, uint64_t size);
-
-int moocbt_reconfigure_auto_expand(unsigned int minor, uint64_t step_size, uint64_t reserved_space);
-
 /**
  * Get the first available minor.
  *

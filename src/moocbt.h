@@ -47,19 +47,6 @@ struct reconfigure_params {
         unsigned int minor; // requested minor number of the device
 };
 
-struct expand_cow_file_params {
-        uint64_t size; // size in mib
-
-        unsigned int minor; // minor to extend
-};
-
-struct reconfigure_auto_expand_params {
-        uint64_t step_size; // step size in mib
-        uint64_t reserved_space; // reserved space in mib
-
-        unsigned int minor; // minor to configure
-};
-
 #define COW_UUID_SIZE 16
 #define COW_BLOCK_LOG_SIZE 12
 #define COW_BLOCK_SIZE (1 << COW_BLOCK_LOG_SIZE)
@@ -119,10 +106,5 @@ struct moocbt_info {
 #define IOCTL_MOOCBT_INFO                                                     \
         _IOR(MOOCBT_IOCTL_MAGIC, 8, struct moocbt_info) // in: see above
 #define IOCTL_GET_FREE _IOR(MOOCBT_IOCTL_MAGIC, 9, int)
-#define IOCTL_EXPAND_COW_FILE                                                  \
-        _IOW(MOOCBT_IOCTL_MAGIC, 10, struct expand_cow_file_params) // in: see above
-#define IOCTL_RECONFIGURE_AUTO_EXPAND                                          \
-        _IOW(MOOCBT_IOCTL_MAGIC, 11, struct reconfigure_auto_expand_params) 
-                                                              // in: see above
 
 #endif /* MOOCBT_H_ */

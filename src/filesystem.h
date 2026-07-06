@@ -20,16 +20,6 @@
 #define _get_macro(_1,_2,_3,_4,_5,_6,NAME,...) NAME
 #define file_write(...) _get_macro(__VA_ARGS__, file_write6, file_write5)(__VA_ARGS__)
 
-// #define file_lock(filp) file_switch_lock(filp, true, false)
-// #define file_unlock(filp) file_switch_lock(filp, false, false)
-// #define file_unlock_mark_dirty(filp) file_switch_lock(filp, false, true)
-
-// replaced with moocbt_mutable_file lock/unlock mechanism
-// INODE Attribute Locking is based on the S_IMMUTABLE flag
-// #define inode_attr_is_locked(inode) ( (inode->i_flags) & S_IMMUTABLE )
-// #define inode_attr_lock(inode) do{ inode->i_flags |= S_IMMUTABLE; } while(0)
-// #define inode_attr_unlock(inode) do{ inode->i_flags &= ~S_IMMUTABLE; } while(0)
-
 #ifndef HAVE_STRUCT_PATH
 //#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,20)
 #define moocbt_get_dentry(f) (f)->f_dentry
@@ -59,22 +49,22 @@ struct file;
 struct dentry;
 struct vfsmount;
 
-struct moocbt_mutable_file {
+struct moocbt_cow_file {
         struct file *filp;
         struct dentry *dentry;
         struct inode *inode;
         struct vfsmount *mnt;
-        
+
         atomic_t writers;
 };
 
-struct moocbt_mutable_file* moocbt_mutable_file_wrap(struct file*);
+struct moocbt_cow_file* moocbt_cow_file_wrap(struct file*);
 
-void moocbt_mutable_file_unlock(struct moocbt_mutable_file*);
+void moocbt_cow_file_unlock(struct moocbt_cow_file*);
 
-void moocbt_mutable_file_lock(struct moocbt_mutable_file*);
+void moocbt_cow_file_lock(struct moocbt_cow_file*);
 
-void moocbt_mutable_file_unwrap(struct moocbt_mutable_file*);
+void moocbt_cow_file_unwrap(struct moocbt_cow_file*);
 
 #ifndef HAVE_STRUCT_PATH
 //#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,20)
@@ -90,16 +80,16 @@ typedef mode_t fmode_t;
 
 int file_open(const char *filename, int flags, struct file **filp);
 
-int file_io(struct moocbt_mutable_file *dfilp, struct snap_device* dev, int is_write, void *buf, sector_t offset,
+int file_io(struct moocbt_cow_file *dfilp, struct snap_device* dev, int is_write, void *buf, sector_t offset,
             unsigned long len, unsigned long *done);
 
-int file_truncate(struct moocbt_mutable_file *dfilp, loff_t len);
+int file_truncate(struct moocbt_cow_file *dfilp, loff_t len);
 
-int file_allocate(struct moocbt_mutable_file *dfilp, struct snap_device* dev, uint64_t offset, uint64_t length, uint64_t *done);
+int file_allocate(struct moocbt_cow_file *dfilp, struct snap_device* dev, uint64_t offset, uint64_t length, uint64_t *done);
 
-int file_unlink(struct moocbt_mutable_file* dfilp);
+int file_unlink(struct moocbt_cow_file* dfilp);
 
-void file_close(struct moocbt_mutable_file *filp);
+void file_close(struct moocbt_cow_file *filp);
 
 void __file_close_raw(struct file *dfilp);
 
@@ -111,7 +101,7 @@ int dentry_get_relative_pathname(struct dentry *dentry, char **buf,
                                  int *len_res);
 #endif
 
-int file_get_absolute_pathname(const struct moocbt_mutable_file *dfilp, char **buf,
+int file_get_absolute_pathname(const struct moocbt_cow_file *dfilp, char **buf,
                                int *len_res);
 
 int pathname_to_absolute(const char *pathname, char **buf, int *len_res);
@@ -141,19 +131,5 @@ void moocbt_inode_unlock(struct inode *inode);
 #define moocbt_inode_lock inode_lock
 #define moocbt_inode_unlock inode_unlock
 #endif
-
-struct vm_area_struct* moocbt_vm_area_allocate(struct mm_struct* mm);
-
-void moocbt_vm_area_free(struct vm_area_struct *vma);
-
-void moocbt_mm_lock(struct mm_struct* mm);
-
-void moocbt_mm_unlock(struct mm_struct* mm);
-
-int file_write_block(struct snap_device* dev, const void* block, size_t offset, size_t len);
-
-int file_read_block(struct snap_device* dev, void* block, size_t offset, size_t len);
-
-sector_t sector_by_offset(struct snap_device*dev, size_t offset);
 
 #endif /* FILESYSTEM_H_ */
