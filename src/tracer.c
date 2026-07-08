@@ -1301,16 +1301,24 @@ static int __tracer_transition_tracing(
         bool freezed;
         MAYBE_UNUSED(ret);
 
-        // we do not allow freeze to fail during starting tracing
-        // we allow freeze to fail in case of finishing tracing and device is in fail condition
         ret = __try_freeze_bdev(bdev, &sb);
-        if(ret != 0 && start_tracing){
-                return ret;
+        if (ret == 0) {
+                freezed = true;
+        } else {
+                // Cannot proceed if freeze fails when starting tracing.
+                if (start_tracing) {
+                        return ret;
+                }
+                // Cannot proceed if freeze fails when finishing tracing if the
+                // device is not in a fail state.
+                // If the error is ENOENT, the bdev is not mounted, so there's
+                // nothing to freeze. Proceed with tracing in this case,
+                // because no IO will reach the device anyway.
+                if (ret != -ENOENT && !tracer_read_fail_state(dev)) {
+                        return ret;
+                }
+                freezed = false;
         }
-        if(ret != 0 && !start_tracing && tracer_read_fail_state(dev) == 0){
-                return ret;
-        }
-        freezed = (ret == 0);
         smp_wmb();
         if(start_tracing){
                 LOG_DEBUG("starting tracing");
