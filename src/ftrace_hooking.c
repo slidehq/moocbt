@@ -1,4 +1,5 @@
 #include "ftrace_hooking.h"
+#include <asm/syscall.h>
 #include <linux/kprobes.h>
 
 static inline bool moocbt_within_module(unsigned long addr, const struct module *mod)
@@ -34,6 +35,21 @@ static inline bool moocbt_within_module(unsigned long addr, const struct module 
 #endif //HAVE_SYS_OLDUMOUNT
 #endif //LINUX_VERSION_CODE
 
+// do_move_mount() is static and its kallsyms name is unstable, so hook the
+// arch's syscall wrapper which has a stable name.
+// The hook passes kernel-space strings to handle_bdev_mount_event(), so it
+// also requires a kernel where the mount handlers receive kernel strings,
+// indicated by USE_PATH_MOUNT or USE_DO_MOUNT.
+#if defined(HAVE_SYS_MOVE_MOUNT) && \
+        (defined(USE_PATH_MOUNT) || defined(USE_DO_MOUNT))
+        #if defined(CONFIG_X86_64)
+                #define USE_SYS_MOVE_MOUNT
+                #define SYS_MOVE_MOUNT_SYMBOL "__x64_sys_move_mount"
+        #else
+                #pragma message "disabling move_mount hook, no syscall wrapper for this arch"
+        #endif
+#endif //HAVE_SYS_MOVE_MOUNT
+
 #ifdef USE_PATH_MOUNT
 static int (*orig_path_mount)(const char *dev_name, struct path *path,
 		const char *type_page, unsigned long flags, void *data_page);
@@ -48,6 +64,8 @@ static int ftrace_path_mount(const char *dev_name, struct path *path,
         unsigned long real_flags = flags;
         char *dir_name = NULL;
         char *buf = NULL;
+
+        LOG_DEBUG("hook triggered: %s", __func__);
 
         buf = kmalloc(PATH_MAX, GFP_KERNEL);
         if (!buf) {
@@ -100,6 +118,8 @@ static long ftrace_do_mount(const char *dev_name, const char __user *dir_name,
         long sys_ret;
         unsigned int idx = 0;
         unsigned long real_flags = flags;
+
+        LOG_DEBUG("hook triggered: %s", __func__);
            
         // get rid of the magic value if its present
         if ((real_flags & MS_MGC_MSK) == MS_MGC_VAL)
@@ -141,6 +161,8 @@ static int ftrace_ksys_mount(char __user *dev_name, char __user *dir_name, char 
         long sys_ret = 0;
         unsigned int idx = 0;
         unsigned long real_flags = flags;
+
+        LOG_DEBUG("hook triggered: %s", __func__);
  
         // get rid of the magic value if its present
         if ((real_flags & MS_MGC_MSK) == MS_MGC_VAL)
@@ -183,6 +205,8 @@ static asmlinkage long ftrace_sys_mount(char __user *dev_name, char __user *dir_
         unsigned int idx = 0;
         unsigned long real_flags = flags;
 
+        LOG_DEBUG("hook triggered: %s", __func__);
+
         // get rid of the magic value if its present
         if ((real_flags & MS_MGC_MSK) == MS_MGC_VAL)
                 real_flags &= ~MS_MGC_MSK;
@@ -210,6 +234,83 @@ static asmlinkage long ftrace_sys_mount(char __user *dev_name, char __user *dir_
 }
 #endif //USE_SYS_MOUNT
 
+#ifdef USE_SYS_MOVE_MOUNT
+static asmlinkage long (*orig_sys_move_mount)(struct pt_regs *regs);
+
+static asmlinkage long ftrace_sys_move_mount(struct pt_regs *regs)
+{
+        long sys_ret;
+        unsigned int idx = 0;
+        unsigned int lookup_flags = 0;
+        int to_dfd;
+        const char __user *to_pathname;
+        unsigned int flags;
+        struct path path;
+        char *dir_name;
+        char *buf = NULL;
+        unsigned long args[6];
+
+        LOG_DEBUG("hook triggered: %s", __func__);
+
+        // move_mount(from_dfd, from_pathname, to_dfd, to_pathname, flags)
+        syscall_get_arguments(current, regs, args);
+        to_dfd = (int)args[2];
+        to_pathname = (const char __user *)args[3];
+        flags = (unsigned int)args[4];
+
+        sys_ret = orig_sys_move_mount(regs);
+        if (sys_ret) {
+                return sys_ret;
+        }
+
+        if (!(flags & MOVE_MOUNT_F_EMPTY_PATH)) {
+                // Moving a currently attached mount to another location does
+                // not change the state of the driver.
+                return sys_ret;
+        }
+#ifdef MOVE_MOUNT_BENEATH
+        // MOVE_MOUNT_BENEATH was added in kernel 6.5
+        if (flags & MOVE_MOUNT_BENEATH) {
+                // A mount attached beneath an existing mount does not change
+                // which filesystem is visible at the mount point, so it does
+                // not change the state of the driver.
+                return sys_ret;
+        }
+#endif //MOVE_MOUNT_BENEATH
+
+        if (flags & MOVE_MOUNT_T_SYMLINKS) {
+                lookup_flags |= LOOKUP_FOLLOW;
+        }
+        if (flags & MOVE_MOUNT_T_AUTOMOUNTS) {
+                lookup_flags |= LOOKUP_AUTOMOUNT;
+        }
+        if (flags & MOVE_MOUNT_T_EMPTY_PATH) {
+                lookup_flags |= LOOKUP_EMPTY;
+        }
+
+        if (user_path_at(to_dfd, to_pathname, lookup_flags, &path)) {
+                return sys_ret;
+        }
+
+        // read-only mounts do not affect the state of the driver
+        if (!((path.mnt->mnt_flags & MNT_READONLY) ||
+                (path.mnt->mnt_sb->s_flags & MS_RDONLY)))
+        {
+                buf = kmalloc(PATH_MAX, GFP_KERNEL);
+                if (buf) {
+                        dir_name = d_path(&path, buf, PATH_MAX);
+                        if (!IS_ERR(dir_name)) {
+                                handle_bdev_mounted_writable(dir_name, &idx);
+                        }
+                        kfree(buf);
+                }
+        }
+
+        path_put(&path);
+        return sys_ret;
+}
+#endif //USE_SYS_MOVE_MOUNT
+
 #ifdef USE_PATH_UMOUNT
 static int (*orig_path_umount)(struct path *path, int flags);
 
@@ -221,6 +322,8 @@ static int ftrace_path_umount(struct path *path, int flags)
         char *dir_name = NULL;
         char *buf;
         int real_flags = flags;
+
+        LOG_DEBUG("hook triggered: %s", __func__);
 
         // get rid of the magic value if its present
         if ((real_flags & MS_MGC_MSK) == MS_MGC_VAL)
@@ -254,6 +357,8 @@ static int ftrace_ksys_umount(char __user *name, int flags)
 	int ret = 0;
         int sys_ret = 0;
         unsigned int idx = 0;
+
+        LOG_DEBUG("hook triggered: %s", __func__);
         
         ret = handle_bdev_mount_nowrite(name, flags, &idx);
 
@@ -273,6 +378,8 @@ static asmlinkage long ftrace_sys_umount(char __user *name, int flags)
         long sys_ret = 0;
         unsigned int idx = 0;
 
+        LOG_DEBUG("hook triggered: %s", __func__);
+
         ret = handle_bdev_mount_nowrite(name, flags, &idx);
         sys_ret = orig_sys_umount(name, flags);
         post_umount_check(ret, sys_ret, idx, name);
@@ -289,6 +396,8 @@ asmlinkage long ftrace_sys_oldumount(char __user *name)
         int ret;
         long sys_ret;
         unsigned int idx;
+
+        LOG_DEBUG("hook triggered: %s", __func__);
        
         ret = handle_bdev_mount_nowrite(name, 0, &idx);
         sys_ret = orig_sys_oldumount(name);
@@ -306,6 +415,10 @@ static struct ftrace_hook ftrace_hooks[] = {
 #ifdef USE_PATH_UMOUNT
         HOOK("path_umount", ftrace_path_umount, &orig_path_umount),
 #endif //USE_PATH_UMOUNT
+
+#ifdef USE_SYS_MOVE_MOUNT
+        HOOK(SYS_MOVE_MOUNT_SYMBOL, ftrace_sys_move_mount, &orig_sys_move_mount),
+#endif //USE_SYS_MOVE_MOUNT
 
 #ifdef USE_DO_MOUNT
         HOOK("do_mount", ftrace_do_mount, &orig_do_mount),
