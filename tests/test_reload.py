@@ -30,65 +30,55 @@ class TestReload(DeviceTestCase):
         if not os.path.ismount(self.mount):
             util.mount(self.device, self.mount)
 
-    def _setup_then_teardown(self, to_incremental):
-        # Setup tracking, creating a valid cow file on the volume, then destroy the tracer.
+    def _track_then_teardown(self, to_incremental):
+        # Like _setup_then_teardown, but writes known data first so there is a
+        # non-zero changed-block count persisted into the cow file. Returns the
+        # count observed just before the device is torn down.
         self.assertEqual(moocbt.setup(self.minor, self.device, self.cow_full_path), 0)
         if to_incremental:
             self.assertEqual(moocbt.transition_to_incremental(self.minor), 0)
-        # Unmounting transitions the snap device to dormant, which syncs and
-        # closes the cow file.
+
+        with open("{}/tracked".format(self.mount), "w") as f:
+            f.write("Z" * 200000)  # spans many 4K blocks
+        os.sync()
+
+        pre = moocbt.info(self.minor)["nr_changed_blocks"]
+        self.assertGreater(pre, 0)
+
+        # Unmount syncs and closes the cow file (persisting the tracking data),
+        # then destroy leaves the cow file on disk, as across a reboot.
         util.unmount(self.mount)
         self.addCleanup(self._ensure_mounted)
-        # Destroy preserves the cow file on disk, similar to the module being
-        # unloaded across a reboot with tracking data intact.
         self.assertEqual(moocbt.destroy(self.minor), 0)
+        return pre
 
-    def test_reload_incremental_sets_unverified(self):
-        self._setup_then_teardown(to_incremental=True)
-
-        self.assertEqual(moocbt.reload_incremental(self.minor, self.device, self.cow_reload_path), 0)
-        self.addCleanup(moocbt.destroy, self.minor)
-
-        info = moocbt.info(self.minor)
-        self.assertIsNotNone(info)
-        self.assertEqual(info["state"], 4)  # UNVERIFIED (incremental)
-        self.assertEqual(info["error"], 0)
-
-    def test_reload_snapshot_sets_unverified(self):
-        self._setup_then_teardown(to_incremental=False)
-
-        self.assertEqual(moocbt.reload_snapshot(self.minor, self.device, self.cow_reload_path), 0)
-        self.addCleanup(moocbt.destroy, self.minor)
-
-        info = moocbt.info(self.minor)
-        self.assertIsNotNone(info)
-        self.assertEqual(info["state"], 5)  # UNVERIFIED | SNAPSHOT
-        self.assertEqual(info["error"], 0)
-        # The snapshot device is not created until the device is verified
-        self.assertFalse(os.path.exists(self.snap_device))
-
-    def test_reload_incremental_mount_activates(self):
-        self._setup_then_teardown(to_incremental=True)
+    def test_reload_incremental_preserves_tracking(self):
+        # The whole point of reload: changed-block tracking survives a module
+        # unload / reboot, so the next incremental backup copies the right data.
+        pre = self._track_then_teardown(to_incremental=True)
 
         self.assertEqual(moocbt.reload_incremental(self.minor, self.device, self.cow_reload_path), 0)
         self.addCleanup(moocbt.destroy, self.minor)
         self.assertEqual(moocbt.info(self.minor)["state"], 4)  # UNVERIFIED
 
-        # Mounting the tracked volume fires the mount hook, which verifies the
-        # cow file and transitions the device from unverified to active.
         util.mount(self.device, self.mount)
         util.settle()
 
         info = moocbt.info(self.minor)
         self.assertEqual(info["state"], 2)  # ACTIVE (incremental)
         self.assertEqual(info["error"], 0)
+        self.assertGreaterEqual(info["nr_changed_blocks"], pre,
+                                "changed-block count was lost across reload")
 
-    def test_reload_snapshot_mount_activates(self):
-        self._setup_then_teardown(to_incremental=False)
+    def test_reload_snapshot_preserves_tracking(self):
+        pre = self._track_then_teardown(to_incremental=False)
 
         self.assertEqual(moocbt.reload_snapshot(self.minor, self.device, self.cow_reload_path), 0)
         self.addCleanup(moocbt.destroy, self.minor)
         self.assertEqual(moocbt.info(self.minor)["state"], 5)  # UNVERIFIED | SNAPSHOT
+
+        # The snapshot device is not created until the device is verified
+        self.assertFalse(os.path.exists(self.snap_device))
 
         util.mount(self.device, self.mount)
         util.settle()
@@ -96,7 +86,9 @@ class TestReload(DeviceTestCase):
         info = moocbt.info(self.minor)
         self.assertEqual(info["state"], 3)  # ACTIVE | SNAPSHOT
         self.assertEqual(info["error"], 0)
-        # Verification recreates the snapshot block device.
+        self.assertGreaterEqual(info["nr_changed_blocks"], pre,
+                                "changed-block count was lost across reload")
+        # Recreates the snapshot device
         self.assertTrue(os.path.exists(self.snap_device))
 
 
