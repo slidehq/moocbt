@@ -143,7 +143,7 @@
 
 
 Name:            moocbt
-Version:         0.12.4
+Version:         0.12.5
 Release:         1%{?dist}
 Summary:         Kernel module and utilities for enabling low-level live backups
 Vendor:          Project Orca Inc.
@@ -672,6 +672,15 @@ rm %{_systemd_shutdown}/moocbt_umount_rootfs.shutdown
 rm %{_systemd_services}/moocbt-umount-rootfs.service
 
 %changelog
+* Thu Jul 16 2026 Jeff Knapp <jeff@slide.tech> - 0.12.5
+- Add fd-based mounting support via move_mount
+- Fix dormant-to-tracing transitions hanging on freeze failure
+- Mount XFS with norecovery to prevent writes
+- Remove COW file expansion functionality
+- Prefix umount_rootfs service/shutdown with moocbt
+- Add package conflicts with dattobd
+- Fix Ubuntu 26.04 dracut/initramfs selection conditions
+
 * Tue Jun 16 2026 Stu <stu@slide.tech> - 0.12.4
 - Add dracut initramfs module support for Ubuntu 26.04
 
