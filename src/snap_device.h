@@ -12,7 +12,6 @@
 #include "bio_queue.h"
 #include "bio_request_callback.h"
 #include "includes.h"
-#include "submit_bio.h"
 #include "sset_queue.h"
 #include "blkdev.h"
 

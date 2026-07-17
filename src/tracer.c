@@ -19,7 +19,6 @@
 #include "mrf.h"
 #include "snap_device.h"
 #include "snap_ops.h"
-#include "submit_bio.h"
 #include "task_helper.h"
 #include "tracer_helper.h"
 #include "tracing_params.h"
@@ -30,19 +29,6 @@
 // #if LINUX_VERSION_CODE >= KERNEL_VERSION(5,7,0)
 #include <linux/percpu-refcount.h>
 #endif
-
-
-// Helpers to get/set either the make_request_fn or the submit_bio function
-// pointers in a block device.
-static inline BIO_REQUEST_CALLBACK_FN *moocbt_get_bd_fn(
-    struct block_device *bdev)
-{
-#ifdef USE_BDOPS_SUBMIT_BIO
-        return bdev->bd_disk->fops->submit_bio;
-#else
-        return bdev->bd_disk->queue->make_request_fn;
-#endif
-}
 
 #define __tracer_setup_cow_new(dev, bdev, cow_path, size, fallocated_space, \
                                cache_size, uuid, seqid)                     \

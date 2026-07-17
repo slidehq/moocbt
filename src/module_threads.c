@@ -14,7 +14,6 @@
 #include "snap_device.h"
 #include "snap_handle.h"
 #include "sset_queue.h"
-#include "submit_bio.h"
 #include "tracer_helper.h"
 
 // this is defined in 3.16 and up
