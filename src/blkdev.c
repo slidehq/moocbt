@@ -168,7 +168,7 @@ struct super_block *moocbt_get_super(struct block_device * bd)
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(6,6,0)
         return (struct super_block*)(bd -> bd_holder);
 #elif GET_ACTIVE_SUPER_ADDR != 0
-        struct super_block* (*get_active_superblock)(struct block_device*)= (GET_ACTIVE_SUPER_ADDR != 0) ? (struct super_block* (*)(struct block_device*))(GET_ACTIVE_SUPER_ADDR +(long long)(((void*)kfree)-(void*)KFREE_ADDR)):NULL;
+        struct super_block* (*get_active_superblock)(struct block_device*) = (struct super_block* (*)(struct block_device*))(GET_ACTIVE_SUPER_ADDR +(long long)(((void*)kfree)-(void*)KFREE_ADDR));
         return get_active_superblock(bd);
 #else
         #error "Could not determine super block of block device"
@@ -194,6 +194,7 @@ void moocbt_drop_super(struct super_block *sb)
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(6,6,0)
         return;
 #elif GET_ACTIVE_SUPER_ADDR != 0
+        deactivate_super(sb);
         return;
 #else
         #error "Could not determine super block of block device"
