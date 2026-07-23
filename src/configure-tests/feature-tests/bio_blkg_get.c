@@ -12,6 +12,7 @@
 MODULE_LICENSE("GPL");
 
 static inline void dummy(void){
-    struct bio* b = NULL;
-    blkg_get(b->bi_blkg);
+	struct bio* b = NULL;
+	blkg_get(b->bi_blkg);
 }
+
