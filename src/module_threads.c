@@ -199,7 +199,7 @@ int snap_mrf_thread(void *data)
 
                 // blk_qc_t (*)(struct request_queue *, struct bio *)’                 // {aka ‘unsigned int (*)(struct request_queue *, struct bio *)’} but argument is of type ‘struct snap_device *’
 
-                SUBMIT_BIO_REAL(dev,bio);
+                submit_bio(dev,bio);
 #ifdef HAVE_MAKE_REQUEST_FN_INT
                 if (ret)
                         generic_make_request(bio);
