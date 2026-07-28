@@ -259,14 +259,14 @@ static int inc_trace_bio(struct snap_device *dev, struct bio *bio)
         bio_iter_t iter;
         bio_iter_bvec_t bvec;
 
-#ifdef HAVE_ENUM_REQ_OPF
+#ifdef HAVE_ENUM_REQ_OP_WRITE_ZEROES
         //#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,10,0)
         if (bio_op(bio) == REQ_OP_WRITE_ZEROES) {
                 ret = inc_make_sset(dev, bio_sector(bio),
                                     bio_size(bio) / SECTOR_SIZE);
                 goto out;
         }
-#endif
+#endif //HAVE_ENUM_REQ_OP_WRITE_ZEROES
         bio_for_each_segment (bvec, bio, iter) {
                 if (page_get_inode(bio_iter_page(bio, iter)) !=
                     dev->sd_cow_inode) {
