@@ -589,11 +589,11 @@ int bio_needs_cow(struct bio *bio, struct inode *inode)
         bio_iter_t iter;
         bio_iter_bvec_t bvec;
 
-#if defined HAVE_ENUM_REQ_OPF || (defined HAVE_ENUM_REQ_OP && defined HAVE_ENUM_REQ_OPF_WRITE_ZEROES)
+#ifdef HAVE_ENUM_REQ_OP_WRITE_ZEROES
         //#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,10,0)
         if (bio_op(bio) == REQ_OP_WRITE_ZEROES)
                 return 1;
-#endif
+#endif //HAVE_ENUM_REQ_OP_WRITE_ZEROES
 
         // check the inode of each page return true if it does not match our cow
         // file
