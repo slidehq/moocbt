@@ -1,4 +1,5 @@
 #include "ftrace_hooking.h"
+#include "tracer.h"
 #include <asm/syscall.h>
 #include <linux/kprobes.h>
 
@@ -45,6 +46,18 @@
                 #pragma message "disabling move_mount hook, no syscall wrapper for this arch"
 	#endif //CONFIG_X86_64
 #endif //HAVE_SYS_MOVE_MOUNT
+
+#ifdef USE_HOOK_TRACER
+static void ftrace___submit_bio(unsigned long ip, unsigned long parent_ip,
+		struct ftrace_ops *ops, struct ftrace_regs *fregs) {
+	struct bio *bio = (struct bio *) ftrace_regs_get_argument(fregs, 0);
+
+	int result = moocbt_trace_bio(bio);
+	if (result) {
+		LOG_ERROR(result, "failed to trace bio");
+	}
+}
+#endif //USE_HOOK_TRACER
 
 #ifdef USE_PATH_MOUNT_PREEMPT_RETHOOK
 
@@ -633,6 +646,10 @@ asmlinkage long ftrace_sys_oldumount(char __user *name)
 #endif //USE_SYS_OLDUMOUNT
 
 static struct ftrace_hook ftrace_hooks[] = {
+#ifdef USE_HOOK_TRACER
+	HOOK("__submit_bio", ftrace___submit_bio, NULL, 0),
+#endif //USE_HOOK_TRACER
+
 #ifdef USE_PATH_MOUNT_PREEMPT_RETHOOK
 	HOOK("path_mount", ftrace_path_mount_preempt_rh, NULL, 0),
 #endif //USE_PATH_MOUNT_PREEMPT_RETHOOK
@@ -761,8 +778,9 @@ static void notrace ftrace_callback_handler(unsigned long ip, unsigned long pare
 				struct ftrace_ops *, struct ftrace_regs *) = 
 			(void (*)(unsigned long, unsigned long,
 				struct ftrace_ops *, struct ftrace_regs *)) hook->function;
-		function(ip, parent_ip, ops, fregs);
-
+		if (!moocbt_within_module(parent_ip, THIS_MODULE)) {
+			function(ip, parent_ip, ops, fregs);
+		}
 	}
 }
 

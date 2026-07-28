@@ -67,4 +67,7 @@ void __tracer_unverified_inc_to_active(struct snap_device *dev,
 void __tracer_dormant_to_active(struct snap_device *dev,
                                 const char __user *user_mount_path);
 
+
+int moocbt_trace_bio(struct bio *bio);
+
 #endif /* TRACER_H_ */

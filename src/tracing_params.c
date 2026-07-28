@@ -11,6 +11,7 @@
 #include "includes.h"
 #include "logging.h"
 #include "snap_device.h"
+#include "tracer.h"
 
 /**
  * tp_alloc() - Allocates and initializes tracing params and increments the
@@ -42,7 +43,10 @@ int tp_alloc(struct snap_device *dev, struct bio *bio,
         tp->bio_sects.head = NULL;
         tp->bio_sects.tail = NULL;
         atomic_set(&tp->refs, 1);
-
+#ifdef USE_HOOK_TRACER
+	init_completion(&tp->read_done);
+	atomic_set(&tp->pending_reads, 1);
+#endif //USE_HOOK_TRACER
         *tp_out = tp;
         return 0;
 }
@@ -69,10 +73,11 @@ void tp_put(struct tracing_params *tp)
         if (atomic_dec_and_test(&tp->refs)) {
                 struct bio_sector_map *next, *curr = NULL;
 
+#ifndef USE_HOOK_TRACER
                 // if there are no references left, its safe to release the
                 // orig_bio
                 bio_queue_add(&tp->dev->sd_orig_bios, tp->orig_bio);
-
+#endif //USE_HOOK_TRACER
                 // free nodes in the sector map list
                 for (curr = tp->bio_sects.head; curr != NULL; curr = next) {
                         next = curr->next;

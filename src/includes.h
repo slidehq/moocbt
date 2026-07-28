@@ -29,4 +29,7 @@
 #include <linux/rwsem.h>
 #include <linux/string.h>
 
+// TODO do this better
+#define USE_HOOK_TRACER 1
+
 #endif

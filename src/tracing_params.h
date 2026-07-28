@@ -10,6 +10,10 @@
 
 #include "includes.h"
 
+#ifdef USE_HOOK_TRACER
+#include <linux/completion.h>
+#endif //USE_HOOK_TRACER
+
 struct bio;
 struct snap_device;
 
@@ -23,6 +27,12 @@ struct tracing_params {
         struct snap_device *dev;
         atomic_t refs;
         struct bsector_list bio_sects;
+#ifdef USE_HOOK_TRACER
+	// fired once all read clones have read the original data into memory
+	struct completion read_done;
+	// counts outstanding clones plus one additional reference
+	atomic_t pending_reads;
+#endif //USE_HOOK_TRACER
 };
 
 int tp_alloc(struct snap_device *dev, struct bio *bio,

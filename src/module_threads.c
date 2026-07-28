@@ -15,6 +15,7 @@
 #include "snap_handle.h"
 #include "sset_queue.h"
 #include "tracer_helper.h"
+#include "tracer.h"
 
 // this is defined in 3.16 and up
 #ifndef MIN_NICE
@@ -198,8 +199,7 @@ int snap_mrf_thread(void *data)
                 moocbt_bio_op_set_flag(bio, MOOCBT_PASSTHROUGH);
 
                 // blk_qc_t (*)(struct request_queue *, struct bio *)’                 // {aka ‘unsigned int (*)(struct request_queue *, struct bio *)’} but argument is of type ‘struct snap_device *’
-
-                submit_bio(dev,bio);
+                moocbt_submit_bio(bio);
 #ifdef HAVE_MAKE_REQUEST_FN_INT
                 if (ret)
                         generic_make_request(bio);
@@ -208,3 +208,35 @@ int snap_mrf_thread(void *data)
 
         return 0;
 }
+
+#ifdef USE_HOOK_TRACER
+/**
+ * snap_read_thread() - Submits read-clone BIOs to the block IO layer.
+ *
+ * @data: The &struct snap_device object pointer.
+ *
+ * The hook tracer enqueues read clones here instead of submitting them from the
+ * __submit_bio hook directly. The hook runs with a non-NULL current->bio_list,
+ * which would only buffer the clone instead of dispatching it, deadlocking the
+ * hook's wait for completion. This thread has a clean current->bio_list, so its
+ * submit_bio() dispatches the clone immediately.
+ */
+int snap_read_thread(void *data) {
+	struct snap_device *dev = data;
+	struct bio_queue *bq = &dev->sd_read_bios;
+	struct bio *bio = NULL;
+
+	set_user_nice(current, MIN_NICE);
+	while (!kthread_should_stop() || !bio_queue_empty(bq)) {
+		wait_event_interruptible(bq->event, kthread_should_stop() ||
+				!bio_queue_empty(bq));
+		if (bio_queue_empty(bq)) {
+			continue;
+		}
+		bio = bio_queue_dequeue(bq);
+		moocbt_submit_bio(bio);
+	}
+	return 0;
+}
+#endif //USE_HOOK_TRACER
+
