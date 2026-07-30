@@ -120,3 +120,22 @@ int tp_add(struct tracing_params *tp, struct bio *bio)
         }
         return 0;
 }
+
+#ifdef USE_HOOK_TRACER
+/**
+ * tp_wait_for_reads() - Block until every read clone has copied its source
+ * blocks into the snapshot.
+ *
+ * tp_alloc() set pending_reads to 1 so the completion cannot fire while we are
+ * still enqueuing clones. This function drops that reference, firing the
+ * completion if all clones are already finished, then waits. Once this returns
+ * it is safe for the kernel to submit the original write.
+ */
+void tp_wait_for_reads(struct tracing_params *tp) {
+	if (atomic_dec_and_test(&tp->pending_reads)) {
+		complete(&tp->read_done);
+	}
+	wait_for_completion_io(&tp->read_done);
+}
+#endif //USE_HOOK_TRACER
+

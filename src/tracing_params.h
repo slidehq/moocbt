@@ -41,4 +41,8 @@ void tp_get(struct tracing_params *tp);
 void tp_put(struct tracing_params *tp);
 int tp_add(struct tracing_params *tp, struct bio *bio);
 
+#ifdef USE_HOOK_TRACER
+void tp_wait_for_reads(struct tracing_params *tp);
+#endif //USE_HOOK_TRACER
+
 #endif /* TRACING_PARAMS_H_ */

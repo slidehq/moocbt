@@ -195,17 +195,12 @@ static int snap_trace_bio(struct snap_device *dev, struct bio *bio)
         }
 
 #ifdef USE_HOOK_TRACER
-	// if every clone is already completed, fire the completion now
-	if (atomic_dec_and_test(&tp->pending_reads)) {
-		complete(&tp->read_done);
-	}
-
 	// block until all read clones have read the original data into memory.
 	// Once this returns, the hook returns and the kernel submits the
 	// original write, which can now safely overwrite the source blocks.
-	wait_for_completion_io(&tp->read_done);
+	tp_wait_for_reads(tp);
 #endif //USE_HOOK_TRACER
-        
+
         // drop our reference to the tp
         tp_put(tp);
 
@@ -219,9 +214,17 @@ error:
         if (new_bio)
                 bio_free_clone(new_bio);
 
-        if (tp)
+        if (tp) {
+#ifdef USE_HOOK_TRACER
+		// Wait for any read clones already enqueued to finish copying
+		// the source blocks. This is needed here because the original
+		// write would be submitted and overwrite blocks the snapshot 
+		// has not captured yet.
+		tp_wait_for_reads(tp);
+#endif //USE_HOOK_TRACER
                 tp_put(tp);
-        
+	}
+
         return 0;
 }
 
