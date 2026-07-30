@@ -16,4 +16,5 @@ static int dummy_endio(struct bio *bio, unsigned int bytes, int err){
 static inline void dummy(void){
 	struct bio bio;
 	bio.bi_end_io = dummy_endio;
+	(void)bio;
 }

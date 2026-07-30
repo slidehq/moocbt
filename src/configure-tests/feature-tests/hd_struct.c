@@ -12,4 +12,5 @@ MODULE_LICENSE("GPL");
 static inline void dummy(void){
 	struct hd_struct hd;
 	hd.start_sect = 1;
+	(void)hd;
 }

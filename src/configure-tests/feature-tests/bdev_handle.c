@@ -17,4 +17,5 @@ static inline void dummy(void){
 
     bh.bdev = &bd;
     bh.holder = (void*)&holder;
+    (void)bh;
 }

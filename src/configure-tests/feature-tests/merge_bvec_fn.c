@@ -16,4 +16,5 @@ static int dummy_merge_bvec(struct request_queue *q, struct bvec_merge_data *bvm
 static inline void dummy(void){
 	struct request_queue q;
 	q.merge_bvec_fn = dummy_merge_bvec;
+	(void)q;
 }

@@ -18,4 +18,5 @@ static inline void dummy(void){
     const struct blk_holder_ops bho;
 
     bh = bdev_open_by_path(path, mode, (void*)&holder, &bho);
+    (void)bh;
 }

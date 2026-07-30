@@ -12,4 +12,5 @@ MODULE_LICENSE("GPL");
 static inline void dummy(void){
 	fmode_t f;
 	f = 0;
+	(void)f;
 }

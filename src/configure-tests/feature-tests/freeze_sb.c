@@ -12,4 +12,5 @@ MODULE_LICENSE("GPL");
 static inline void dummy(void){
     struct super_block* sb;
     sb = freeze_bdev(NULL);
+    (void)sb;
 }
