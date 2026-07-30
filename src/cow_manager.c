@@ -122,23 +122,17 @@ static int __cow_alloc_section(struct cow_manager *cm, unsigned long sect_idx,
  */
 static int __cow_load_section(struct cow_manager *cm, unsigned long sect_idx)
 {
-        int ret, i;
-        int sect_size_bytes = COW_SECTION_SIZE * sizeof(uint64_t);
+        int ret;
 
         ret = __cow_alloc_section(cm, sect_idx, 0);
         if (ret)
                 goto error;
 
-        for (i = 0; i < sect_size_bytes / COW_BLOCK_SIZE; i++) {
-		// int mapping_offset = (COW_BLOCK_SIZE / sizeof(cm->sects[sect_idx].mappings[0])) * i;
-		// int cow_file_offset = COW_BLOCK_SIZE * i;
-
-                ret = file_read(cm->dfilp, cm->dev, cm->sects[sect_idx].mappings,
-                                cm->sect_size * sect_idx * 8 + COW_HEADER_SIZE,
-                                cm->sect_size * 8);
-                if (ret)
-                        goto error;
-        }
+        ret = file_read(cm->dfilp, cm->dev, cm->sects[sect_idx].mappings,
+                        cm->sect_size * sect_idx * 8 + COW_HEADER_SIZE,
+                        cm->sect_size * 8);
+        if (ret)
+                goto error;
 
         return 0;
 
@@ -160,12 +154,7 @@ error:
  */
 static int __cow_write_section(struct cow_manager *cm, unsigned long sect_idx)
 {
-        int i, ret;
-        int sect_size_bytes = COW_SECTION_SIZE * sizeof(uint64_t);
-
-        for (i = 0; i < sect_size_bytes / COW_BLOCK_SIZE; i++) {
-		// int mapping_offset = (COW_BLOCK_SIZE / sizeof(cm->sects[sect_idx].mappings[0])) * i;
-		// int cow_file_offset = COW_BLOCK_SIZE * i;
+        int ret;
 
         ret = file_write(cm->dfilp, cm->dev, cm->sects[sect_idx].mappings,
                          cm->sect_size * sect_idx * 8 + COW_HEADER_SIZE,
@@ -173,7 +162,6 @@ static int __cow_write_section(struct cow_manager *cm, unsigned long sect_idx)
         if (ret) {
                 LOG_ERROR(ret, "error writing cow manager section to file");
                 return ret;
-        }
         }
 
         return 0;
