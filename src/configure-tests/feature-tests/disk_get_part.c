@@ -14,4 +14,5 @@ static inline void dummy(void){
     u8 partno;
     struct hd_struct* hd;
     hd = disk_get_part(gd, partno);
+    (void)hd;
 }

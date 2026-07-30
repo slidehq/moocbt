@@ -12,4 +12,5 @@ MODULE_LICENSE("GPL");
 static inline void dummy(void){
 	struct path p;
 	p.mnt = NULL;
+	(void)p;
 }

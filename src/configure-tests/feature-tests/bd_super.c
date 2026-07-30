@@ -12,4 +12,5 @@ MODULE_LICENSE("GPL");
 static inline void dummy(void){
 	struct block_device bd;
 	bd.bd_super = 0;
+	(void)bd;
 }

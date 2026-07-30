@@ -15,4 +15,5 @@ static inline void dummy(void){
 	int bvec_pool_size;
 	int scale;
 	bs = bioset_create(bio_pool_size, bvec_pool_size, scale);
+	(void)bs;
 }

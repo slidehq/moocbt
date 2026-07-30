@@ -12,4 +12,5 @@ MODULE_LICENSE("GPL");
 static inline void dummy(void){
 	struct bio bio;
 	bio.bi_pool = NULL;
+	(void)bio;
 }

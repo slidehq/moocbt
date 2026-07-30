@@ -15,4 +15,5 @@ static inline void dummy(void){
     struct gendisk gd;
     bd.bd_disk = &gd;
     bio.bi_bdev = &bd;
+    (void)bio;
 }

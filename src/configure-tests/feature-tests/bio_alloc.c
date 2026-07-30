@@ -13,4 +13,5 @@ static inline void dummy(void){
 	struct bio *new_bio;
 
 	new_bio = bio_alloc(GFP_KERNEL, 1);
+	(void)new_bio;
 }

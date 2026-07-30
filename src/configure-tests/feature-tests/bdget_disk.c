@@ -14,4 +14,5 @@ static inline void dummy(void){
     u8 partno;
     struct block_device* bd;
     bd = bdget_disk(gd, partno);
+    (void)bd;
 }
