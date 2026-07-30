@@ -6,11 +6,12 @@
  */
 
 #include "includes.h"
+#include <linux/ftrace.h>
 
 MODULE_LICENSE("GPL");
 
 static inline void dummy(void){
 	struct ftrace_regs fregs;
-	fregs.regs.bp = 1;
-	(void)fregs;
+	struct pt_regs *regs = ftrace_get_regs(&fregs);
+	(void) regs;
 }

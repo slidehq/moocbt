@@ -13,5 +13,6 @@ MODULE_LICENSE("GPL");
 static inline void dummy(void) {
 	struct ftrace_regs *fregs;
 	unsigned long ret = ftrace_regs_get_return_value(fregs);
+	(void) ret;
 }
 

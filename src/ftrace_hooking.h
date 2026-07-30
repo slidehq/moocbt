@@ -43,18 +43,20 @@ struct ftrace_hook {
 #include <linux/ftrace_regs.h>
 #endif //HAVE_FTRACE_REGS_H
 
-#if !defined(HAVE_FTRACE_REGS_H) && defined(HAVE_FTRACE_REGS)
+#ifndef ftrace_regs_get_return_value
+#ifdef ftrace_regs_return_value
+#define ftrace_regs_get_return_value(fregs) \
+	ftrace_regs_return_value(fregs)
+#else //ftrace_regs_get_return_value
+#define ftrace_regs_get_return_value(fregs) \
+	regs_return_value(ftrace_get_regs(fregs))
+#endif //ftrace_regs_return_value
+#endif //ftrace_regs_get_return_value
 
 #ifndef ftrace_regs_get_argument
 #define ftrace_regs_get_argument(fregs, n) \
 	regs_get_kernel_argument(ftrace_get_regs(fregs), n)
 #endif //ftrace_regs_get_argument
-
-#ifndef ftrace_regs_return_value
-#define ftrace_regs_return_value(fregs) \
-	regs_return_value(ftrace_get_regs(fregs))
-#endif //ftrace_regs_return_value
-#endif //HAVE_FTRACE_REGS
 
 #ifndef HAVE_FTRACE_REGS
 #define ftrace_regs pt_regs
