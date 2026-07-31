@@ -43,10 +43,6 @@ int tp_alloc(struct snap_device *dev, struct bio *bio,
         tp->bio_sects.head = NULL;
         tp->bio_sects.tail = NULL;
         atomic_set(&tp->refs, 1);
-#ifdef USE_HOOK_TRACER
-	init_completion(&tp->read_done);
-	atomic_set(&tp->pending_reads, 1);
-#endif //USE_HOOK_TRACER
         *tp_out = tp;
         return 0;
 }
@@ -73,11 +69,7 @@ void tp_put(struct tracing_params *tp)
         if (atomic_dec_and_test(&tp->refs)) {
                 struct bio_sector_map *next, *curr = NULL;
 
-#ifndef USE_HOOK_TRACER
-                // if there are no references left, its safe to release the
-                // orig_bio
                 bio_queue_add(&tp->dev->sd_orig_bios, tp->orig_bio);
-#endif //USE_HOOK_TRACER
                 // free nodes in the sector map list
                 for (curr = tp->bio_sects.head; curr != NULL; curr = next) {
                         next = curr->next;
@@ -120,22 +112,4 @@ int tp_add(struct tracing_params *tp, struct bio *bio)
         }
         return 0;
 }
-
-#ifdef USE_HOOK_TRACER
-/**
- * tp_wait_for_reads() - Block until every read clone has copied its source
- * blocks into the snapshot.
- *
- * tp_alloc() set pending_reads to 1 so the completion cannot fire while we are
- * still enqueuing clones. This function drops that reference, firing the
- * completion if all clones are already finished, then waits. Once this returns
- * it is safe for the kernel to submit the original write.
- */
-void tp_wait_for_reads(struct tracing_params *tp) {
-	if (atomic_dec_and_test(&tp->pending_reads)) {
-		complete(&tp->read_done);
-	}
-	wait_for_completion_io(&tp->read_done);
-}
-#endif //USE_HOOK_TRACER
 

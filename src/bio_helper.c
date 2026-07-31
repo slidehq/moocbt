@@ -14,6 +14,7 @@
 #include "tracing_params.h"
 #include "tracer.h"
 #include <linux/bio.h>
+#include <linux/completion.h>
 #if defined(HAVE_BIO_BLKG_GET) || defined(HAVE_BIO_CLONE_BLKG_ASSOCIATION)
 #include <linux/blk-cgroup.h>
 #endif
@@ -453,12 +454,8 @@ static void __on_bio_read_complete(struct bio *bio, int err)
         atomic64_inc(&dev->sd_received_cnt);
         smp_wmb();
 
-#ifdef USE_HOOK_TRACER
-	if (atomic_dec_and_test(&tp->pending_reads)) {
-		complete(&tp->read_done);
-	}
-#endif //USE_HOOK_TRACER
-
+        // dropping this clone's reference lets tp_put() hand orig_bio to
+        // snap_mrf_thread once every clone has captured its source blocks
         tp_put(tp);
 
         return;
@@ -466,11 +463,6 @@ static void __on_bio_read_complete(struct bio *bio, int err)
 error:
         LOG_ERROR(ret, "error during bio read complete callback");
         tracer_set_fail_state(dev, ret);
-#ifdef USE_HOOK_TRACER
-	if (atomic_dec_and_test(&tp->pending_reads)) {
-		complete(&tp->read_done);
-	}
-#endif //USE_HOOK_TRACER
         tp_put(tp);
         bio_free_clone(bio);
 }

@@ -217,9 +217,11 @@ int snap_mrf_thread(void *data)
  *
  * The hook tracer enqueues read clones here instead of submitting them from the
  * __submit_bio hook directly. The hook runs with a non-NULL current->bio_list,
- * which would only buffer the clone instead of dispatching it, deadlocking the
- * hook's wait for completion. This thread has a clean current->bio_list, so its
- * submit_bio() dispatches the clone immediately.
+ * which would only buffer the clone instead of dispatching it. This thread has a
+ * clean current->bio_list, so its submit_bio() dispatches the clone immediately.
+ * The clones must make progress promptly because the original write is held back
+ * (queued to sd_orig_bios) until every clone completes and captures its source
+ * blocks.
  */
 int snap_read_thread(void *data) {
 	struct snap_device *dev = data;

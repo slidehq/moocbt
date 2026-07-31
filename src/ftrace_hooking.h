@@ -24,17 +24,19 @@ struct ftrace_hook {
 	void *function;
 	void *original;
 	unsigned long op_flags;
+	bool direct_hook_call;
 
 	unsigned long address;
 	struct ftrace_ops ops;
 };
 
-#define HOOK(_name, _function, _original, _op_flags) \
+#define HOOK(_name, _function, _original, _op_flags, _direct_hook_call) \
 	{ \
 		.name = (_name), \
 		.function = (_function), \
 		.original = (_original), \
 		.op_flags = (_op_flags), \
+		.direct_hook_call = (_direct_hook_call), \
 	}
 
 #define USE_FENTRY_OFFSET 0

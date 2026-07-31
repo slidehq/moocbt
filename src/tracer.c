@@ -115,6 +115,7 @@ static int snap_trace_bio(struct snap_device *dev, struct bio *bio)
         if (!bio_needs_cow(bio, dev->sd_cow_inode) || tracer_read_fail_state(dev))
         {
 #ifdef USE_HOOK_TRACER
+		// nothing to submit directly, it will be submitted elsewhere
 		return 0;
 #elif defined(HAVE_NONVOID_SUBMIT_BIO_1)
                 return SUBMIT_BIO_REAL(dev, bio);
@@ -163,12 +164,6 @@ static int snap_trace_bio(struct snap_device *dev, struct bio *bio)
                         goto error;
 
                 atomic64_inc(&dev->sd_submitted_cnt);
-#ifdef USE_HOOK_TRACER
-		// account for this outstanding read before handing it off, so
-		// the completion can't drop pending_reads to zero before we
-		// finish enqueuing
-		atomic_inc(&tp->pending_reads);
-#endif //USE_HOOK_TRACER
                 smp_wmb();
 
 #ifdef USE_HOOK_TRACER
@@ -194,17 +189,18 @@ static int snap_trace_bio(struct snap_device *dev, struct bio *bio)
                 break;
         }
 
-#ifdef USE_HOOK_TRACER
-	// block until all read clones have read the original data into memory.
-	// Once this returns, the hook returns and the kernel submits the
-	// original write, which can now safely overwrite the source blocks.
-	tp_wait_for_reads(tp);
-#endif //USE_HOOK_TRACER
-
-        // drop our reference to the tp
+	// drop our reference to the tp. Once the pending read clones drop
+	// theirs, tp_put() hands orig_bio to snap_mrf_thread, which submits it
+	// only after the source blocks have been captured into the snapshot.
         tp_put(tp);
 
+#ifdef USE_HOOK_TRACER
+	// Return 1 to tell the __submit_bio hook not to submit the bio because
+	// snap_mrf_thread will handle submitting it instead.
+	return 1;
+#else //USE_HOOK_TRACER
         return 0;
+#endif //USE_HOOK_TRACER
 
 error:
         LOG_ERROR(ret, "error tracing bio for snapshot");
@@ -215,15 +211,16 @@ error:
                 bio_free_clone(new_bio);
 
         if (tp) {
+		// Dropping the tp reference allows it to submit the original
+		// bio when the read clones complete.
+		tp_put(tp);
 #ifdef USE_HOOK_TRACER
-		// Wait for any read clones already enqueued to finish copying
-		// the source blocks. This is needed here because the original
-		// write would be submitted and overwrite blocks the snapshot 
-		// has not captured yet.
-		tp_wait_for_reads(tp);
+		// Return 1 to tell the __submit_bio hook not to submit the
+		// bio because snap_mrf_thread will handle submitting it
+		// instead.
+                return 1;
 #endif //USE_HOOK_TRACER
-                tp_put(tp);
-	}
+        }
 
         return 0;
 }
@@ -1506,6 +1503,16 @@ out:
 }
 
 #ifdef USE_HOOK_TRACER
+/**
+ * moocbt_trace_bio() - Traces a bio.
+ *
+ * @bio: the &struct bio the kernel is about to submit.
+ *
+ * Return:
+ * * 1 - the bio is deferred for COW operations, and should not be submitted
+ *       directly.
+ * * 0 - the bio is safe to submit directly.
+ */
 int moocbt_trace_bio(struct bio *bio) {
 	int ret = 0;
 	int i = 0;

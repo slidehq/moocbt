@@ -48,13 +48,22 @@
 #endif //HAVE_SYS_MOVE_MOUNT
 
 #ifdef USE_HOOK_TRACER
-static void ftrace___submit_bio(unsigned long ip, unsigned long parent_ip,
+// No-op function for preventing __submit_bio from executing when bios are
+// deferred by COW operations
+static void notrace moocbt___submit_bio_noop(struct bio *bio) {
+	(void) bio;
+}
+
+static void notrace ftrace___submit_bio(unsigned long ip, unsigned long parent_ip,
 		struct ftrace_ops *ops, struct ftrace_regs *fregs) {
 	struct bio *bio = (struct bio *) ftrace_regs_get_argument(fregs, 0);
 
-	int result = moocbt_trace_bio(bio);
-	if (result) {
-		LOG_ERROR(result, "failed to trace bio");
+	if (moocbt_trace_bio(bio)) {
+		// a non-zero return value indicates the bio must not be submitted
+		// so COW operations happen in the correct order, and so that the
+		// bio is not double-submitted.
+		struct pt_regs *regs = ftrace_get_regs(fregs);
+		regs->ip = (unsigned long) moocbt___submit_bio_noop;
 	}
 }
 #endif //USE_HOOK_TRACER
@@ -647,55 +656,55 @@ asmlinkage long ftrace_sys_oldumount(char __user *name)
 
 static struct ftrace_hook ftrace_hooks[] = {
 #ifdef USE_HOOK_TRACER
-	HOOK("__submit_bio", ftrace___submit_bio, NULL, 0),
+	HOOK("__submit_bio", ftrace___submit_bio, NULL, FTRACE_OPS_FL_RECURSION | FTRACE_OPS_FL_IPMODIFY, false),
 #endif //USE_HOOK_TRACER
 
 #ifdef USE_PATH_MOUNT_PREEMPT_RETHOOK
-	HOOK("path_mount", ftrace_path_mount_preempt_rh, NULL, 0),
+	HOOK("path_mount", ftrace_path_mount_preempt_rh, NULL, 0, false),
 #endif //USE_PATH_MOUNT_PREEMPT_RETHOOK
 
 #ifdef USE_PATH_UMOUNT_PREEMPT_RETHOOK
-	HOOK("path_umount", ftrace_path_umount_preempt_rh, NULL, 0),
+	HOOK("path_umount", ftrace_path_umount_preempt_rh, NULL, 0, false),
 #endif //USE_PATH_UMOUNT_PREEMPT_RETHOOK
 
 #ifdef USE_PATH_MOUNT
-        HOOK("path_mount", ftrace_path_mount, &orig_path_mount, FTRACE_OPS_FL_RECURSION | FTRACE_OPS_FL_IPMODIFY),
+        HOOK("path_mount", ftrace_path_mount, &orig_path_mount, FTRACE_OPS_FL_RECURSION | FTRACE_OPS_FL_IPMODIFY, true),
 #endif //USE_PATH_MOUNT
 
 #ifdef USE_PATH_UMOUNT
-        HOOK("path_umount", ftrace_path_umount, &orig_path_umount, FTRACE_OPS_FL_RECURSION | FTRACE_OPS_FL_IPMODIFY),
+        HOOK("path_umount", ftrace_path_umount, &orig_path_umount, FTRACE_OPS_FL_RECURSION | FTRACE_OPS_FL_IPMODIFY, true),
 #endif //USE_PATH_UMOUNT
 
 #ifdef USE_SYS_MOVE_MOUNT_PREEMPT_RETHOOK
-	HOOK(SYS_MOVE_MOUNT_SYMBOL, ftrace_move_mount_preempt_rh, NULL, 0)
+	HOOK(SYS_MOVE_MOUNT_SYMBOL, ftrace_move_mount_preempt_rh, NULL, 0, false)
 #endif //USE_SYS_MOVE_MOUNT_PREEMPT_RETHOOK
 
 #ifdef USE_SYS_MOVE_MOUNT
-        HOOK(SYS_MOVE_MOUNT_SYMBOL, ftrace_sys_move_mount, &orig_sys_move_mount, FTRACE_OPS_FL_RECURSION | FTRACE_OPS_FL_IPMODIFY),
+        HOOK(SYS_MOVE_MOUNT_SYMBOL, ftrace_sys_move_mount, &orig_sys_move_mount, FTRACE_OPS_FL_RECURSION | FTRACE_OPS_FL_IPMODIFY, true),
 #endif //USE_SYS_MOVE_MOUNT
 
 #ifdef USE_DO_MOUNT
-        HOOK("do_mount", ftrace_do_mount, &orig_do_mount, FTRACE_OPS_FL_RECURSION | FTRACE_OPS_FL_IPMODIFY),
+        HOOK("do_mount", ftrace_do_mount, &orig_do_mount, FTRACE_OPS_FL_RECURSION | FTRACE_OPS_FL_IPMODIFY, true),
 #endif //USE_DO_MOUNT
 
 #ifdef USE_KSYS_MOUNT
-        HOOK("ksys_mount", ftrace_ksys_mount, &orig_ksys_mount, FTRACE_OPS_FL_RECURSION | FTRACE_OPS_FL_IPMODIFY),
+        HOOK("ksys_mount", ftrace_ksys_mount, &orig_ksys_mount, FTRACE_OPS_FL_RECURSION | FTRACE_OPS_FL_IPMODIFY, true),
 #endif //USE_KSYS_MOUNT
 
 #ifdef USE_KSYS_UMOUNT
-        HOOK("ksys_umount", ftrace_ksys_umount, &orig_ksys_umount, FTRACE_OPS_FL_RECURSION | FTRACE_OPS_FL_IPMODIFY),
+        HOOK("ksys_umount", ftrace_ksys_umount, &orig_ksys_umount, FTRACE_OPS_FL_RECURSION | FTRACE_OPS_FL_IPMODIFY, true),
 #endif //USE_KSYS_UMOUNT
 
 #ifdef USE_SYS_MOUNT
-        HOOK("sys_mount", ftrace_sys_mount, &orig_sys_mount, FTRACE_OPS_FL_RECURSION | FTRACE_OPS_FL_IPMODIFY),
+        HOOK("sys_mount", ftrace_sys_mount, &orig_sys_mount, FTRACE_OPS_FL_RECURSION | FTRACE_OPS_FL_IPMODIFY, true),
 #endif //USE_SYS_MOUNT
 
 #ifdef USE_SYS_UMOUNT
-        HOOK("sys_umount", ftrace_sys_umount, &orig_sys_umount, FTRACE_OPS_FL_RECURSION | FTRACE_OPS_FL_IPMODIFY),
+        HOOK("sys_umount", ftrace_sys_umount, &orig_sys_umount, FTRACE_OPS_FL_RECURSION | FTRACE_OPS_FL_IPMODIFY, true),
 #endif //USE_SYS_UMOUNT
 
 #ifdef USE_SYS_OLDUMOUNT
-        HOOK("sys_oldumount", ftrace_sys_oldumount, &orig_sys_oldumount, FTRACE_OPS_FL_RECURSION | FTRACE_OPS_FL_IPMODIFY),
+        HOOK("sys_oldumount", ftrace_sys_oldumount, &orig_sys_oldumount, FTRACE_OPS_FL_RECURSION | FTRACE_OPS_FL_IPMODIFY, true),
 #endif //USE_SYS_OLDUMOUNT
 };
 
@@ -764,11 +773,11 @@ static void notrace ftrace_callback_handler(unsigned long ip, unsigned long pare
 		struct ftrace_ops *ops, struct ftrace_regs *fregs)
 {
 	struct ftrace_hook *hook = container_of(ops, struct ftrace_hook, ops);
-	if (ops->flags & FTRACE_OPS_FL_IPMODIFY) {
+	if (hook->direct_hook_call && ops->flags & FTRACE_OPS_FL_IPMODIFY) {
 		struct pt_regs *regs = ftrace_get_regs(fregs);
 #if USE_FENTRY_OFFSET
 		regs->ip = (unsigned long)hook->function;
-#else
+#else //USE_FENTRY_OFFSET
 		if (!moocbt_within_module(parent_ip, THIS_MODULE)) {
 			regs->ip = (unsigned long)hook->function;
 		}
