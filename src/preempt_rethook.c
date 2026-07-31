@@ -340,7 +340,7 @@ unsigned long preempt_rethook_trampoline_handler(struct pt_regs *regs,
 	correct_ret_addr = preempt_rethook_find_ret_addr(current, &node);
 	if (!correct_ret_addr) {
 		LOG_ERROR(1, "preempt_rethook: return address not found");
-		WARN_ON_ONCE(1);
+		BUG_ON(1);
 	}
 
 	instruction_pointer_set(regs, correct_ret_addr);
@@ -352,11 +352,11 @@ unsigned long preempt_rethook_trampoline_handler(struct pt_regs *regs,
 	spin_lock(&preempt_rh_task_nodes_lock);
 	struct preempt_rh_task_node *prhtn = preempt_rh_task_node_find(
 			current);
-	if (!prhtn) {
-		LOG_ERROR(1, "preempt_rethook: preempt_rh_task_node_find not found in trampoline handler");
-		WARN_ON_ONCE(1);
-	}
 	spin_unlock(&preempt_rh_task_nodes_lock);
+	if (!prhtn) {
+		LOG_ERROR(1, "preempt_rethook: preempt_rh_task_node not found in trampoline handler");
+		BUG_ON(1);
+	}
 	first = prhtn->llist.first;
 	while (first) {
 		prhn = container_of(first, struct preempt_rh_node, llist);
