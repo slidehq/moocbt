@@ -23,6 +23,7 @@
 #include "tracer_helper.h"
 #include "tracing_params.h"
 #include <linux/blk-mq.h>
+#include <linux/sched.h>
 #include <linux/version.h>
 #include "stack_limits.h"
 #ifdef HAVE_BLK_ALLOC_QUEUE
@@ -890,6 +891,24 @@ static void __tracer_bioset_exit(struct snap_device *dev)
 #endif
 }
 
+#ifdef USE_HOOK_TRACER
+/**
+ * __tracer_wait_for_read_clones() - Wait for all deferred read clones to
+ *                                   complete.
+ */
+static void __tracer_wait_for_read_clones(struct snap_device *dev) {
+	while (atomic64_read(&dev->sd_submitted_cnt) !=
+			atomic64_read(&dev->sd_received_cnt)) {
+		// uninterruptible because it is never safe to stop the thread
+		// while read clones are still reading from the device
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		// should only happen in exceptional cases and unmounting, so
+		// the performance of polling every 1ms is acceptable
+		io_schedule_timeout(msecs_to_jiffies(1));
+	}
+}
+#endif //USE_HOOK_TRACER
+
 /**
  * __tracer_destroy_snap() - Tears down a snap device.
  *
@@ -898,6 +917,15 @@ static void __tracer_bioset_exit(struct snap_device *dev)
 static void __tracer_destroy_snap(struct snap_device *dev)
 {
         LOG_DEBUG("tracer_destroy_snap");
+
+#ifdef USE_HOOK_TRACER
+	// ensure all read clones are processed so write bios being deferred
+	// are not lost when the snap device is destroyed
+	if (dev->sd_read_thread) {
+		__tracer_wait_for_read_clones(dev);
+	}
+#endif //USE_HOOK_TRACER
+
         if (dev->sd_mrf_thread) {
                 LOG_DEBUG("stopping mrf thread");
                 kthread_stop(dev->sd_mrf_thread);
