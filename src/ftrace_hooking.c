@@ -3,18 +3,14 @@
 #include <asm/syscall.h>
 #include <linux/kprobes.h>
 
-#ifndef CONFIG_X86_KERNEL_IBT
-#define CONFIG_X86_KERNEL_IBT 0
-#endif
-
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5,9,0)
-#if CONFIG_X86_KERNEL_IBT
+#ifdef MOOCBT_IBT_SUPPORT
 	#define USE_PATH_MOUNT_PREEMPT_RETHOOK
 	#define USE_PATH_UMOUNT_PREEMPT_RETHOOK
-#else
+#else //MOOCBT_IBT_SUPPORT
         #define USE_PATH_MOUNT
         #define USE_PATH_UMOUNT
-#endif //CONFIG_X86_KERNEL_IBT
+#endif //MOOCBT_IBT_SUPPORT
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(5,5,0)
         #define USE_DO_MOUNT
         #define USE_KSYS_UMOUNT

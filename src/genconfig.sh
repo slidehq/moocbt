@@ -110,6 +110,34 @@ while read SYMBOL_NAME; do
 	printf '\tSYMBOL("%s", %d) \\\n' "$SYMBOL_NAME" "$PRESENT" >> $SYMBOL_MANIFEST_FILE
 done < $SYMBOL_TESTS_FILE
 
+# Detect whether the CPU building the module supports IBT.
+#
+# Use "FORCE_IBT=1" or "FORCE_IBT=0" environment variables to force enable
+# building with or without IBT support respectively. Leave the environment
+# variable unset to fallback to detecting with the current system's CPU.
+case "$FORCE_IBT" in
+	1)
+		echo "performing configure test: BUILD_CPU_HAS_IBT_FORCE_ON - present"
+		echo "#define BUILD_CPU_HAS_IBT_FORCE_ON" >> $OUTPUT_FILE
+		;;
+	0)
+		echo "performing configure test: BUILD_CPU_HAS_IBT_FORCE_OFF - present"
+		echo "#define BUILD_CPU_HAS_IBT_FORCE_OFF" >> $OUTPUT_FILE
+		;;
+	*)
+		if [ -n "$FORCE_IBT" ]; then
+			echo "warning: ignoring invalid FORCE_IBT='$FORCE_IBT' (expected 0 or 1)"
+		fi
+		;;
+esac
+
+if grep -qw ibt /proc/cpuinfo 2>/dev/null; then
+	echo "performing configure test: BUILD_CPU_HAS_IBT - present"
+	echo "#define BUILD_CPU_HAS_IBT" >> $OUTPUT_FILE
+else
+	echo "performing configure test: BUILD_CPU_HAS_IBT - not present"
+fi
+
 echo "" >> $OUTPUT_FILE
 echo "#define MOOCBT_BUILD_SYMBOL_LIST(SYMBOL) \\" >> $OUTPUT_FILE
 LC_ALL=C sort "$SYMBOL_MANIFEST_FILE" >> $OUTPUT_FILE
@@ -118,3 +146,4 @@ rm -f "$SYMBOL_MANIFEST_FILE"
 
 echo "" >> $OUTPUT_FILE
 echo "#endif" >> $OUTPUT_FILE
+
