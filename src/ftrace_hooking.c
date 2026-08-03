@@ -137,7 +137,11 @@ static void ftrace_path_mount_preempt_rh(unsigned long ip,
 			.data_size = sizeof(struct path_mount_ctx),
 			.data = (void*) &ctx,
 		};
-		pre_handler_preempt_rethook(&prh, regs);
+		if (pre_handler_preempt_rethook(&prh, regs)) {
+			LOG_ERROR(-ENOMEM, "failed to setup path_mount post hook");
+			post_umount_check(ctx.ret, 1, ctx.idx, ctx.dir_name);
+			kfree(ctx.buf);
+		}
         } else {
                 // new read-write mount
 		struct pt_regs *regs = ftrace_get_regs(fregs);
@@ -146,7 +150,10 @@ static void ftrace_path_mount_preempt_rh(unsigned long ip,
 			.data_size = sizeof(struct path_mount_ctx),
 			.data = (void*) &ctx,
 		};
-		pre_handler_preempt_rethook(&prh, regs);
+		if (pre_handler_preempt_rethook(&prh, regs)) {
+			LOG_ERROR(-ENOMEM, "failed to setup path_mount post hook");
+			kfree(ctx.buf);
+		}
         }
 }
 
@@ -421,7 +428,9 @@ static void ftrace_move_mount_preempt_rh(unsigned long ip,
 		.data_size = sizeof(struct move_mount_ctx),
 		.data = (void*) &ctx,
 	};
-	pre_handler_preempt_rethook(&prh, trace_regs);
+	if (pre_handler_preempt_rethook(&prh, trace_regs)) {
+		LOG_ERROR(-ENOMEM, "failed to setup sys_move_mount post hook");
+	}
 }
 
 #endif //USE_SYS_MOVE_MOUNT_PREEMPT_RETHOOK
@@ -553,7 +562,11 @@ static void ftrace_path_umount_preempt_rh(unsigned long ip,
 		.data_size = sizeof(struct path_umount_ctx),
 		.data = (void*) &ctx,
 	};
-	pre_handler_preempt_rethook(&prh, regs);
+	if (pre_handler_preempt_rethook(&prh, regs)) {
+		LOG_ERROR(-ENOMEM, "failed to setup path_umount post hook");
+		post_umount_check(ctx.ret, 1, ctx.idx, ctx.dir_name);
+		kfree(ctx.buf);
+	}
 }
 
 #endif //USE_PATH_UMOUNT_PREEMPT_RETHOOK
