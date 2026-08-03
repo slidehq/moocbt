@@ -208,8 +208,10 @@ error:
         tracer_set_fail_state(dev, ret);
 
         // clean up the bio we allocated (but did not submit)
-        if (new_bio)
+        if (new_bio) {
                 bio_free_clone(new_bio);
+		tp_put(tp); // bio_make_read_clone calls tp_get()
+	}
 
         if (tp) {
 		// Dropping the tp reference allows it to submit the original
