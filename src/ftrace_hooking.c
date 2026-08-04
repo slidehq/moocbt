@@ -782,7 +782,7 @@ static void notrace ftrace_callback_handler(unsigned long ip, unsigned long pare
 		struct ftrace_ops *ops, struct ftrace_regs *fregs)
 {
 	struct ftrace_hook *hook = container_of(ops, struct ftrace_hook, ops);
-	if (hook->direct_hook_call && ops->flags & FTRACE_OPS_FL_IPMODIFY) {
+	if (hook->direct_hook_call && (ops->flags & FTRACE_OPS_FL_IPMODIFY)) {
 		struct pt_regs *regs = ftrace_get_regs(fregs);
 #if USE_FENTRY_OFFSET
 		regs->ip = (unsigned long)hook->function;
