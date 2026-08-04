@@ -283,8 +283,9 @@ struct preempt_rh_node *preempt_rethook_try_get(struct preempt_rethook *prh) {
  * entry.)
  */
 void preempt_rethook_hook(struct preempt_rh_node *node, struct pt_regs *regs) {
+	struct preempt_rh_task_node *prhtn;
 	spin_lock(&preempt_rh_task_nodes_lock);
-	struct preempt_rh_task_node *prhtn = preempt_rh_task_node_find(current);
+	prhtn = preempt_rh_task_node_find(current);
 	if (!prhtn) {
 		prhtn = kmalloc(sizeof(struct preempt_rh_task_node), GFP_ATOMIC);
 		if (!prhtn) {
@@ -307,10 +308,11 @@ static unsigned long preempt_rethook_find_ret_addr(struct task_struct *tsk,
 		struct llist_node **cur) {
 	struct preempt_rh_node *prhn = NULL;
 	struct llist_node *node = *cur;
+	struct preempt_rh_task_node *prhtn;
 
 	if (!node) {
 		spin_lock(&preempt_rh_task_nodes_lock);
-		struct preempt_rh_task_node *prhtn = preempt_rh_task_node_find(tsk);
+		prhtn = preempt_rh_task_node_find(tsk);
 		spin_unlock(&preempt_rh_task_nodes_lock);
 		if (prhtn) {
 			node = prhtn->llist.first;
@@ -338,6 +340,7 @@ unsigned long preempt_rethook_trampoline_handler(struct pt_regs *regs,
 	struct llist_node *first, *node = NULL;
 	unsigned long correct_ret_addr;
 	struct preempt_rh_node *prhn;
+	struct preempt_rh_task_node *prhtn;
 
 	correct_ret_addr = preempt_rethook_find_ret_addr(current, &node);
 	if (!correct_ret_addr) {
@@ -352,8 +355,7 @@ unsigned long preempt_rethook_trampoline_handler(struct pt_regs *regs,
 	 * because stackdump inside the handlers needs to decode it.
 	 */
 	spin_lock(&preempt_rh_task_nodes_lock);
-	struct preempt_rh_task_node *prhtn = preempt_rh_task_node_find(
-			current);
+	prhtn = preempt_rh_task_node_find(current);
 	spin_unlock(&preempt_rh_task_nodes_lock);
 	if (!prhtn) {
 		LOG_ERROR(1, "preempt_rethook: preempt_rh_task_node not found in trampoline handler");
