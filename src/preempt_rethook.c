@@ -136,7 +136,7 @@ asm(
 	"    pushl %esp\n"
 	"    pushfl\n"
 	SAVE_REGS_STRING
-	"    movl %esp\n"
+	"    movl %esp, %eax\n"
 	"    call preempt_rethook_trampoline_callback\n"
 	RESTORE_REGS_STRING
 	/* In the callback function, 'regs->flags' is copied to 'regs->ss'. */
@@ -266,6 +266,8 @@ struct preempt_rh_node *preempt_rethook_try_get(struct preempt_rethook *prh) {
 			return NULL;
 		}
 		memcpy(node->data, prh->data, prh->data_size);
+	} else {
+		node->data = NULL;
 	}
 	node->post_hook = prh->post_hook;
 	return node;
