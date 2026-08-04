@@ -6,6 +6,11 @@
 
 #include "preempt_rethook.h"
 #include "logging.h"
+#include "includes.h"
+
+// Kernels without IBT support will be missing required symbols, and this code
+// will not be used on those versions anyway
+#ifdef MOOCBT_IBT_SUPPORT
 
 #include <linux/kprobes.h>
 #include <linux/objtool.h>
@@ -403,4 +408,6 @@ unsigned long preempt_rethook_trampoline_handler(struct pt_regs *regs,
 
 	return correct_ret_addr;
 }
+
+#endif //MOOCBT_IBT_SUPPORT
 

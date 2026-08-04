@@ -12,7 +12,9 @@
 #include "includes.h"
 #include "logging.h"
 #include "bdev_state_handler.h"
+#ifdef MOOCBT_IBT_SUPPORT
 #include "preempt_rethook.h"
+#endif //MOOCBT_IBT_SUPPORT
 
 
 #ifdef HAVE_UAPI_MOUNT_H
