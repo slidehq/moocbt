@@ -213,7 +213,7 @@ error:
 		tp_put(tp); // bio_make_read_clone calls tp_get()
 	}
 
-        if (tp) {
+	if (tp) {
 		// Dropping the tp reference allows it to submit the original
 		// bio when the read clones complete.
 		tp_put(tp);
@@ -221,7 +221,7 @@ error:
 		// Return 1 to tell the __submit_bio hook not to submit the
 		// bio because snap_mrf_thread will handle submitting it
 		// instead.
-                return 1;
+		return 1;
 #endif //USE_HOOK_TRACER
         }
 
@@ -1554,15 +1554,15 @@ int moocbt_trace_bio(struct bio *bio) {
 		if (!tracer_is_bio_for_dev(dev, bio)) {
 			continue;
 		}
-                if (moocbt_bio_op_flagged(bio, MOOCBT_PASSTHROUGH)) {
-                        moocbt_bio_op_clear_flag(bio, MOOCBT_PASSTHROUGH);
+		if (moocbt_bio_op_flagged(bio, MOOCBT_PASSTHROUGH)) {
+			moocbt_bio_op_clear_flag(bio, MOOCBT_PASSTHROUGH);
 			continue;
-                }
+		}
 		if (tracer_should_trace_bio(dev, bio)) {
-                        if (test_bit(SNAPSHOT, &dev->sd_state)) {
-                                ret = snap_trace_bio(dev, bio);
+			if (test_bit(SNAPSHOT, &dev->sd_state)) {
+				ret = snap_trace_bio(dev, bio);
 			} else {
-                                ret = inc_trace_bio(dev, bio);
+				ret = inc_trace_bio(dev, bio);
 			}
 			break;
 		}
