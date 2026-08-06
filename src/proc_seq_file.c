@@ -165,8 +165,7 @@ static int moocbt_proc_show(struct seq_file *m, void *v)
                 {
                         int i = 0;
 #define FEATURE(name, present) \
-        seq_printf(m, "%s\t\t\"%s\": %s", (i++ ? ",\n" : ""), (name), \
-                        (present) ? "true" : "false");
+        seq_printf(m, "%s\t\t\"%s\": %s", (i++ ? ",\n" : ""), (name), (present) ? "true" : "false");
                         MOOCBT_BUILD_FEATURE_LIST(FEATURE)
 #undef FEATURE
                 }
@@ -176,8 +175,7 @@ static int moocbt_proc_show(struct seq_file *m, void *v)
                 {
                         int i = 0;
 #define SYMBOL(name, present) \
-        seq_printf(m, "%s\t\t\"%s\": %s", (i++ ? ",\n" : ""), (name), \
-                        (present) ? "true" : "false");
+        seq_printf(m, "%s\t\t\"%s\": %s", (i++ ? ",\n" : ""), (name), (present) ? "true" : "false");
                         MOOCBT_BUILD_SYMBOL_LIST(SYMBOL)
 #undef SYMBOL
                 }
