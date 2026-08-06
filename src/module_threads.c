@@ -15,7 +15,6 @@
 #include "snap_handle.h"
 #include "sset_queue.h"
 #include "tracer_helper.h"
-#include "tracer.h"
 
 // this is defined in 3.16 and up
 #ifndef MIN_NICE

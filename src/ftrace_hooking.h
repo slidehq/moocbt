@@ -8,7 +8,6 @@
 #include <linux/mount.h>
 #include <linux/version.h>
 #include <linux/ftrace.h>
-#include "tracer.h"
 #include "includes.h"
 #include "logging.h"
 #include "bdev_state_handler.h"

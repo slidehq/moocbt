@@ -12,9 +12,7 @@
 #include "snap_device.h"
 #include "tracer_helper.h"
 #include "tracing_params.h"
-#include "tracer.h"
 #include <linux/bio.h>
-#include <linux/completion.h>
 #if defined(HAVE_BIO_BLKG_GET) || defined(HAVE_BIO_CLONE_BLKG_ASSOCIATION)
 #include <linux/blk-cgroup.h>
 #endif
