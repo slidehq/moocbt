@@ -253,52 +253,52 @@ static int register_ioctl_control_interface(void)
 }
 
 static void log_ibt_support_info(void) {
-	int cpu_build_support = 0;
-	int cpu_runtime_support = 0;
-	int kernel_build_support = 0;
-	int kernel_runtime_support = 0;
-	int driver_support_force_on = 0;
-	int driver_support_force_off = 0;
-	int net_ibt_support_enabled = 0;
+        int cpu_build_support = 0;
+        int cpu_runtime_support = 0;
+        int kernel_build_support = 0;
+        int kernel_runtime_support = 0;
+        int driver_support_force_on = 0;
+        int driver_support_force_off = 0;
+        int net_ibt_support_enabled = 0;
 #ifdef BUILD_CPU_HAS_IBT
-	cpu_build_support = 1;
+        cpu_build_support = 1;
 #endif //BUILD_CPU_HAS_IBT
 #ifdef CONFIG_X86
-	// Read CPUID directly which reflects the physical CPU.
-	// Value is independent of the kernel build config and runtime
-	// "ibt" parameter.
-	// Leaf 7 only exists when the CPU reports a max basic leaf >= 7. Older
-	// CPUs can return another leaf's data if it doesn't exist.
-	if (boot_cpu_data.cpuid_level >= 7) {
-		// CPUID.(EAX=7, ECX=0):EDX[20] is CET_IBT.
-		unsigned int eax, ebx, ecx, edx;
-		cpuid_count(7, 0, &eax, &ebx, &ecx, &edx);
-		cpu_runtime_support = !!(edx & (1u << 20));
-	}
+        // Read CPUID directly which reflects the physical CPU.
+        // Value is independent of the kernel build config and runtime
+        // "ibt" parameter.
+        // Leaf 7 only exists when the CPU reports a max basic leaf >= 7. Older
+        // CPUs can return another leaf's data if it doesn't exist.
+        if (boot_cpu_data.cpuid_level >= 7) {
+                // CPUID.(EAX=7, ECX=0):EDX[20] is CET_IBT.
+                unsigned int eax, ebx, ecx, edx;
+                cpuid_count(7, 0, &eax, &ebx, &ecx, &edx);
+                cpu_runtime_support = !!(edx & (1u << 20));
+        }
 #endif //CONFIG_X86
 #ifdef CONFIG_X86_KERNEL_IBT
-	kernel_build_support = 1;
+        kernel_build_support = 1;
 #endif //CONFIG_X86_KERNEL_IBT
 #if defined(CONFIG_X86) && defined(X86_FEATURE_IBT)
-	kernel_runtime_support = !!cpu_feature_enabled(X86_FEATURE_IBT);
+        kernel_runtime_support = !!cpu_feature_enabled(X86_FEATURE_IBT);
 #endif //CONFIG_X86 && X86_FEATURE_IBT
 #ifdef BUILD_CPU_HAS_IBT_FORCE_ON
-	driver_support_force_on = 1;
+        driver_support_force_on = 1;
 #endif //BUILD_CPU_HAS_IBT_FORCE_ON
 #ifdef BUILD_CPU_HAS_IBT_FORCE_OFF
-	driver_support_force_off = 1;
+        driver_support_force_off = 1;
 #endif //BUILD_CPU_HAS_IBT_FORCE_OFF
 #ifdef MOOCBT_IBT_SUPPORT
-	net_ibt_support_enabled = 1;
+        net_ibt_support_enabled = 1;
 #endif
 
-	LOG_INFO("IBT status: cpu_build_support=%d, cpu_runtime_support=%d, "
-		"kernel_build_support=%d, kernel_runtime_support=%d, "
-		"driver_support_force_on=%d, driver_support_force_off=%d, "
-		"net_ibt_support_enabled=%d", cpu_build_support,
-		cpu_runtime_support, kernel_build_support,
-		kernel_runtime_support, driver_support_force_on,
-		driver_support_force_off, net_ibt_support_enabled);
+        LOG_INFO("IBT status: cpu_build_support=%d, cpu_runtime_support=%d, "
+                "kernel_build_support=%d, kernel_runtime_support=%d, "
+                "driver_support_force_on=%d, driver_support_force_off=%d, "
+                "net_ibt_support_enabled=%d", cpu_build_support,
+                cpu_runtime_support, kernel_build_support,
+                kernel_runtime_support, driver_support_force_on,
+                driver_support_force_off, net_ibt_support_enabled);
 }
 
 /**
@@ -314,7 +314,7 @@ static int __init agent_init(void)
 
         LOG_DEBUG("module init");
 
-	log_ibt_support_info();
+        log_ibt_support_info();
 
         mutex_init(&ioctl_mutex);
 

@@ -5,8 +5,8 @@
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5,9,0)
 #ifdef MOOCBT_IBT_SUPPORT
-	#define USE_PATH_MOUNT_PREEMPT_RETHOOK
-	#define USE_PATH_UMOUNT_PREEMPT_RETHOOK
+        #define USE_PATH_MOUNT_PREEMPT_RETHOOK
+        #define USE_PATH_UMOUNT_PREEMPT_RETHOOK
 #else //MOOCBT_IBT_SUPPORT
         #define USE_PATH_MOUNT
         #define USE_PATH_UMOUNT
@@ -31,125 +31,125 @@
 // also requires a kernel where the mount handlers receive kernel strings,
 // indicated by USE_PATH_MOUNT or USE_DO_MOUNT.
 #ifdef HAVE_SYS_MOVE_MOUNT
-	#if defined(CONFIG_X86_64)
+        #if defined(CONFIG_X86_64)
                 #define SYS_MOVE_MOUNT_SYMBOL "__x64_sys_move_mount"
-		#ifdef USE_PATH_MOUNT_PREEMPT_RETHOOK
-			#define USE_SYS_MOVE_MOUNT_PREEMPT_RETHOOK
-		#elif defined(USE_PATH_MOUNT) || defined(USE_DO_MOUNT)
-         		#define USE_SYS_MOVE_MOUNT
-		#endif //USE_PATH_MOUNT_PREEMPT_RETHOOK
-	#else
+                #ifdef USE_PATH_MOUNT_PREEMPT_RETHOOK
+                        #define USE_SYS_MOVE_MOUNT_PREEMPT_RETHOOK
+                #elif defined(USE_PATH_MOUNT) || defined(USE_DO_MOUNT)
+                        #define USE_SYS_MOVE_MOUNT
+                #endif //USE_PATH_MOUNT_PREEMPT_RETHOOK
+        #else //CONFIG_X86_64
                 #pragma message "disabling move_mount hook, no syscall wrapper for this arch"
-	#endif //CONFIG_X86_64
+        #endif //CONFIG_X86_64
 #endif //HAVE_SYS_MOVE_MOUNT
 
 #ifdef USE_HOOK_TRACER
 // No-op function for preventing __submit_bio from executing when bios are
 // deferred by COW operations
 static void notrace moocbt___submit_bio_noop(struct bio *bio) {
-	(void) bio;
+        (void) bio;
 }
 
 static void notrace ftrace___submit_bio(unsigned long ip, unsigned long parent_ip,
-		struct ftrace_ops *ops, struct ftrace_regs *fregs) {
-	struct bio *bio = (struct bio *) ftrace_regs_get_argument(fregs, 0);
+        struct ftrace_ops *ops, struct ftrace_regs *fregs) {
+        struct bio *bio = (struct bio *) ftrace_regs_get_argument(fregs, 0);
 
-	if (moocbt_trace_bio(bio)) {
-		// a non-zero return value indicates the bio must not be submitted
-		// so COW operations happen in the correct order, and so that the
-		// bio is not double-submitted.
-		struct pt_regs *regs = ftrace_get_regs(fregs);
-		regs->ip = (unsigned long) moocbt___submit_bio_noop;
-	}
+        if (moocbt_trace_bio(bio)) {
+                // a non-zero return value indicates the bio must not be
+                // submitted so COW operations happen in the correct order, and
+                // so that the bio is not double-submitted.
+                struct pt_regs *regs = ftrace_get_regs(fregs);
+                regs->ip = (unsigned long) moocbt___submit_bio_noop;
+        }
 }
 #endif //USE_HOOK_TRACER
 
 #ifdef USE_PATH_MOUNT_PREEMPT_RETHOOK
 
 struct path_mount_ctx {
-	struct path *path;
-	char *dir_name;
-	char *buf;
-	unsigned int idx;
-	int ret;
+        struct path *path;
+        char *dir_name;
+        char *buf;
+        unsigned int idx;
+        int ret;
 };
 
 static void path_mount_rh_remount_ro_post(void *data, unsigned long ip,
-		struct pt_regs *regs) {
-	struct path_mount_ctx *ctx = (struct path_mount_ctx *) data;
-	int sys_ret = (int) regs_return_value(regs);
-	post_umount_check(ctx->ret, sys_ret, ctx->idx, ctx->dir_name);
-	kfree(ctx->buf);
+                struct pt_regs *regs) {
+        struct path_mount_ctx *ctx = (struct path_mount_ctx *) data;
+        int sys_ret = (int) regs_return_value(regs);
+        post_umount_check(ctx->ret, sys_ret, ctx->idx, ctx->dir_name);
+        kfree(ctx->buf);
 }
 
 static void path_mount_rh_mount_rw_post(void *data, unsigned long ip,
-		struct pt_regs *regs) {
-	struct path_mount_ctx *ctx = (struct path_mount_ctx *) data;
-	int sys_ret = (int) regs_return_value(regs);
+                struct pt_regs *regs) {
+        struct path_mount_ctx *ctx = (struct path_mount_ctx *) data;
+        int sys_ret = (int) regs_return_value(regs);
         if (!sys_ret) {
-                ctx->dir_name = d_path(ctx->path, ctx->buf, PATH_MAX);    
+                ctx->dir_name = d_path(ctx->path, ctx->buf, PATH_MAX);
                 ctx->ret = handle_bdev_mounted_writable(ctx->dir_name,
-				&ctx->idx);
+                                &ctx->idx);
         }
-	kfree(ctx->buf);
+        kfree(ctx->buf);
 }
 
 static void ftrace_path_mount_preempt_rh(unsigned long ip,
-		unsigned long parent_ip, struct ftrace_ops *ops,
-		struct ftrace_regs *fregs) {
-	struct path_mount_ctx ctx;
-	struct path *path = (struct path *) ftrace_regs_get_argument(fregs, 1);
-	unsigned long flags = ftrace_regs_get_argument(fregs, 3);
+                unsigned long parent_ip, struct ftrace_ops *ops,
+                struct ftrace_regs *fregs) {
+        struct path_mount_ctx ctx;
+        struct path *path = (struct path *) ftrace_regs_get_argument(fregs, 1);
+        unsigned long flags = ftrace_regs_get_argument(fregs, 3);
         unsigned long real_flags = flags;
 
         LOG_DEBUG("hook triggered: %s", __func__);
 
-	ctx.path = path;
+        ctx.path = path;
         ctx.buf = kmalloc(PATH_MAX, GFP_KERNEL);
         if (!ctx.buf) {
-		LOG_ERROR(-ENOMEM, "failed to allocate path buf");
+                LOG_ERROR(-ENOMEM, "failed to allocate path buf");
                 return;
         }
 
         // get rid of the magic value if it's present 
         if ((real_flags & MS_MGC_MSK) == MS_MGC_VAL) {
                 real_flags &= ~MS_MGC_MSK;
-	}
+        }
 
-   	if (real_flags & (MS_BIND | MS_SHARED | MS_PRIVATE | MS_SLAVE |
+           if (real_flags & (MS_BIND | MS_SHARED | MS_PRIVATE | MS_SLAVE |
                           MS_UNBINDABLE | MS_MOVE) ||
                 ((real_flags & MS_RDONLY) && !(real_flags & MS_REMOUNT))) {
                 // bind, shared, move, or new read-only mounts it do not affect
                 // the state of the driver
-		kfree(ctx.buf);
+                kfree(ctx.buf);
         } else if ((real_flags & MS_RDONLY) && (real_flags & MS_REMOUNT)) {
                 // we are remounting read-only, same as umounting as far as the
                 // driver is concerned
                 ctx.dir_name = d_path(ctx.path, ctx.buf, PATH_MAX);
                 ctx.ret = handle_bdev_mount_nowrite(ctx.dir_name, 0, &ctx.idx);
-		struct pt_regs *regs = ftrace_get_regs(fregs);
-		struct preempt_rethook prh = {
-			.post_hook = path_mount_rh_remount_ro_post,
-			.data_size = sizeof(struct path_mount_ctx),
-			.data = (void*) &ctx,
-		};
-		if (pre_handler_preempt_rethook(&prh, regs)) {
-			LOG_ERROR(-ENOMEM, "failed to setup path_mount post hook");
-			post_umount_check(ctx.ret, 1, ctx.idx, ctx.dir_name);
-			kfree(ctx.buf);
-		}
+                struct pt_regs *regs = ftrace_get_regs(fregs);
+                struct preempt_rethook prh = {
+                        .post_hook = path_mount_rh_remount_ro_post,
+                        .data_size = sizeof(struct path_mount_ctx),
+                        .data = (void*) &ctx,
+                };
+                if (pre_handler_preempt_rethook(&prh, regs)) {
+                        LOG_ERROR(-ENOMEM, "failed to setup path_mount post hook");
+                        post_umount_check(ctx.ret, 1, ctx.idx, ctx.dir_name);
+                        kfree(ctx.buf);
+                }
         } else {
                 // new read-write mount
-		struct pt_regs *regs = ftrace_get_regs(fregs);
-		struct preempt_rethook prh = {
-			.post_hook = path_mount_rh_mount_rw_post,
-			.data_size = sizeof(struct path_mount_ctx),
-			.data = (void*) &ctx,
-		};
-		if (pre_handler_preempt_rethook(&prh, regs)) {
-			LOG_ERROR(-ENOMEM, "failed to setup path_mount post hook");
-			kfree(ctx.buf);
-		}
+                struct pt_regs *regs = ftrace_get_regs(fregs);
+                struct preempt_rethook prh = {
+                        .post_hook = path_mount_rh_mount_rw_post,
+                        .data_size = sizeof(struct path_mount_ctx),
+                        .data = (void*) &ctx,
+                };
+                if (pre_handler_preempt_rethook(&prh, regs)) {
+                        LOG_ERROR(-ENOMEM, "failed to setup path_mount post hook");
+                        kfree(ctx.buf);
+                }
         }
 }
 
@@ -342,37 +342,37 @@ static asmlinkage long ftrace_sys_mount(char __user *dev_name, char __user *dir_
 #ifdef USE_SYS_MOVE_MOUNT_PREEMPT_RETHOOK
 
 struct move_mount_ctx {
-	int to_dfd;
-	const char __user *to_pathname;
-	unsigned int flags;
+        int to_dfd;
+        const char __user *to_pathname;
+        unsigned int flags;
 };
 
 static void move_mount_rh_post(void *data, unsigned long ip,
-		struct pt_regs *regs) {
-	struct move_mount_ctx *ctx = (struct move_mount_ctx *) data;
-	int sys_ret = (int) regs_return_value(regs);
-	unsigned int idx = 0;
-	unsigned int lookup_flags = 0;
+                struct pt_regs *regs) {
+        struct move_mount_ctx *ctx = (struct move_mount_ctx *) data;
+        int sys_ret = (int) regs_return_value(regs);
+        unsigned int idx = 0;
+        unsigned int lookup_flags = 0;
         struct path path;
-	char *buf;
-	char *dir_name;
+        char *buf;
+        char *dir_name;
 
-	if (sys_ret) {
-		return;
-	}
+        if (sys_ret) {
+                return;
+        }
         if (!(ctx->flags & MOVE_MOUNT_F_EMPTY_PATH)) {
                 // Moving a currently attached mount to another location does
                 // not change the state of the driver.
-		return;
-	}
+                return;
+        }
 #ifdef MOVE_MOUNT_BENEATH
-	// MOVE_MOUNT_BENEATH was added in kernel 6.5
-	if (ctx->flags & MOVE_MOUNT_BENEATH) {
-		// A mount attached beneath an existing mount does not change
-		// which filesystem is visible at the mount point, so it does
-		// not change the state of the driver.
-		return;
-	}
+        // MOVE_MOUNT_BENEATH was added in kernel 6.5
+        if (ctx->flags & MOVE_MOUNT_BENEATH) {
+                // A mount attached beneath an existing mount does not change
+                // which filesystem is visible at the mount point, so it does
+                // not change the state of the driver.
+                return;
+        }
 #endif //MOVE_MOUNT_BENEATH
         if (ctx->flags & MOVE_MOUNT_T_SYMLINKS) {
                 lookup_flags |= LOOKUP_FOLLOW;
@@ -390,7 +390,7 @@ static void move_mount_rh_post(void *data, unsigned long ip,
 
         // read-only mounts do not affect the state of the driver
         if (!((path.mnt->mnt_flags & MNT_READONLY) ||
-			(path.mnt->mnt_sb->s_flags & MS_RDONLY))) {
+                        (path.mnt->mnt_sb->s_flags & MS_RDONLY))) {
                 buf = kmalloc(PATH_MAX, GFP_KERNEL);
                 if (buf) {
                         dir_name = d_path(&path, buf, PATH_MAX);
@@ -404,11 +404,11 @@ static void move_mount_rh_post(void *data, unsigned long ip,
 }
 
 static void ftrace_move_mount_preempt_rh(unsigned long ip,
-		unsigned long parent_ip, struct ftrace_ops *ops,
-		struct ftrace_regs *fregs) {
-	struct move_mount_ctx ctx;
-	struct pt_regs *regs = (struct pt_regs *) ftrace_regs_get_argument(fregs, 0);
-	unsigned long args[6];
+                unsigned long parent_ip, struct ftrace_ops *ops,
+                struct ftrace_regs *fregs) {
+        struct move_mount_ctx ctx;
+        struct pt_regs *regs = (struct pt_regs *) ftrace_regs_get_argument(fregs, 0);
+        unsigned long args[6];
 
         LOG_DEBUG("hook triggered: %s", __func__);
 
@@ -418,15 +418,15 @@ static void ftrace_move_mount_preempt_rh(unsigned long ip,
         ctx.to_pathname = (const char __user *) args[3];
         ctx.flags = (unsigned int) args[4];
 
-	struct pt_regs *trace_regs = ftrace_get_regs(fregs);
-	struct preempt_rethook prh = {
-		.post_hook = move_mount_rh_post,
-		.data_size = sizeof(struct move_mount_ctx),
-		.data = (void*) &ctx,
-	};
-	if (pre_handler_preempt_rethook(&prh, trace_regs)) {
-		LOG_ERROR(-ENOMEM, "failed to setup sys_move_mount post hook");
-	}
+        struct pt_regs *trace_regs = ftrace_get_regs(fregs);
+        struct preempt_rethook prh = {
+                .post_hook = move_mount_rh_post,
+                .data_size = sizeof(struct move_mount_ctx),
+                .data = (void*) &ctx,
+        };
+        if (pre_handler_preempt_rethook(&prh, trace_regs)) {
+                LOG_ERROR(-ENOMEM, "failed to setup sys_move_mount post hook");
+        }
 }
 
 #endif //USE_SYS_MOVE_MOUNT_PREEMPT_RETHOOK
@@ -511,58 +511,58 @@ static asmlinkage long ftrace_sys_move_mount(struct pt_regs *regs)
 #ifdef USE_PATH_UMOUNT_PREEMPT_RETHOOK
 
 struct path_umount_ctx {
-	struct path *path;
-	char *dir_name;
-	char *buf;
-	unsigned int idx;
-	int ret;
+        struct path *path;
+        char *dir_name;
+        char *buf;
+        unsigned int idx;
+        int ret;
 };
 
 static void path_umount_rh_post(void *data, unsigned long ip,
-		struct pt_regs *regs) {
-	struct path_umount_ctx *ctx = (struct path_umount_ctx *) data;
-	int sys_ret = (int) regs_return_value(regs);
+                struct pt_regs *regs) {
+        struct path_umount_ctx *ctx = (struct path_umount_ctx *) data;
+        int sys_ret = (int) regs_return_value(regs);
         ctx->dir_name = d_path(ctx->path, ctx->buf, PATH_MAX);
         post_umount_check(ctx->ret, sys_ret, ctx->idx, ctx->dir_name);
         kfree(ctx->buf);
 }
 
 static void ftrace_path_umount_preempt_rh(unsigned long ip,
-		unsigned long parent_ip, struct ftrace_ops *ops,
-		struct ftrace_regs *fregs) {
-	struct path_umount_ctx ctx;
-	struct path *path = (struct path *) ftrace_regs_get_argument(fregs, 0);
-	unsigned long flags = ftrace_regs_get_argument(fregs, 1);
+                unsigned long parent_ip, struct ftrace_ops *ops,
+                struct ftrace_regs *fregs) {
+        struct path_umount_ctx ctx;
+        struct path *path = (struct path *) ftrace_regs_get_argument(fregs, 0);
+        unsigned long flags = ftrace_regs_get_argument(fregs, 1);
         unsigned long real_flags = flags;
 
         LOG_DEBUG("hook triggered: %s", __func__);
 
-	ctx.path = path;
+        ctx.path = path;
         ctx.buf = kmalloc(PATH_MAX, GFP_KERNEL);
         if (!ctx.buf) {
-		LOG_ERROR(-ENOMEM, "failed to allocate path buf");
+                LOG_ERROR(-ENOMEM, "failed to allocate path buf");
                 return;
         }
 
         // get rid of the magic value if its present
         if ((real_flags & MS_MGC_MSK) == MS_MGC_VAL) {
-		real_flags &= ~MS_MGC_MSK;
-	}
+                real_flags &= ~MS_MGC_MSK;
+        }
 
         ctx.dir_name = d_path(ctx.path, ctx.buf, PATH_MAX);
         ctx.ret = handle_bdev_mount_nowrite(ctx.dir_name, real_flags, &ctx.idx);
 
-	struct pt_regs *regs = ftrace_get_regs(fregs);
-	struct preempt_rethook prh = {
-		.post_hook = path_umount_rh_post,
-		.data_size = sizeof(struct path_umount_ctx),
-		.data = (void*) &ctx,
-	};
-	if (pre_handler_preempt_rethook(&prh, regs)) {
-		LOG_ERROR(-ENOMEM, "failed to setup path_umount post hook");
-		post_umount_check(ctx.ret, 1, ctx.idx, ctx.dir_name);
-		kfree(ctx.buf);
-	}
+        struct pt_regs *regs = ftrace_get_regs(fregs);
+        struct preempt_rethook prh = {
+                .post_hook = path_umount_rh_post,
+                .data_size = sizeof(struct path_umount_ctx),
+                .data = (void*) &ctx,
+        };
+        if (pre_handler_preempt_rethook(&prh, regs)) {
+                LOG_ERROR(-ENOMEM, "failed to setup path_umount post hook");
+                post_umount_check(ctx.ret, 1, ctx.idx, ctx.dir_name);
+                kfree(ctx.buf);
+        }
 }
 
 #endif //USE_PATH_UMOUNT_PREEMPT_RETHOOK
@@ -665,15 +665,15 @@ asmlinkage long ftrace_sys_oldumount(char __user *name)
 
 static struct ftrace_hook ftrace_hooks[] = {
 #ifdef USE_HOOK_TRACER
-	HOOK("__submit_bio", ftrace___submit_bio, NULL, FTRACE_OPS_FL_RECURSION | FTRACE_OPS_FL_IPMODIFY, false),
+        HOOK("__submit_bio", ftrace___submit_bio, NULL, FTRACE_OPS_FL_RECURSION | FTRACE_OPS_FL_IPMODIFY, false),
 #endif //USE_HOOK_TRACER
 
 #ifdef USE_PATH_MOUNT_PREEMPT_RETHOOK
-	HOOK("path_mount", ftrace_path_mount_preempt_rh, NULL, 0, false),
+        HOOK("path_mount", ftrace_path_mount_preempt_rh, NULL, 0, false),
 #endif //USE_PATH_MOUNT_PREEMPT_RETHOOK
 
 #ifdef USE_PATH_UMOUNT_PREEMPT_RETHOOK
-	HOOK("path_umount", ftrace_path_umount_preempt_rh, NULL, 0, false),
+        HOOK("path_umount", ftrace_path_umount_preempt_rh, NULL, 0, false),
 #endif //USE_PATH_UMOUNT_PREEMPT_RETHOOK
 
 #ifdef USE_PATH_MOUNT
@@ -685,7 +685,7 @@ static struct ftrace_hook ftrace_hooks[] = {
 #endif //USE_PATH_UMOUNT
 
 #ifdef USE_SYS_MOVE_MOUNT_PREEMPT_RETHOOK
-	HOOK(SYS_MOVE_MOUNT_SYMBOL, ftrace_move_mount_preempt_rh, NULL, 0, false)
+        HOOK(SYS_MOVE_MOUNT_SYMBOL, ftrace_move_mount_preempt_rh, NULL, 0, false)
 #endif //USE_SYS_MOVE_MOUNT_PREEMPT_RETHOOK
 
 #ifdef USE_SYS_MOVE_MOUNT
@@ -770,7 +770,7 @@ static int resolve_hook_address(struct ftrace_hook *hook)
 }
 
 static inline bool moocbt_within_module(unsigned long addr,
-		const struct module *mod) {
+                const struct module *mod) {
 #ifdef HAVE_WITHIN_MODULE
         return within_module(addr, mod);
 #else
@@ -779,27 +779,27 @@ static inline bool moocbt_within_module(unsigned long addr,
 }
 
 static void notrace ftrace_callback_handler(unsigned long ip, unsigned long parent_ip,
-		struct ftrace_ops *ops, struct ftrace_regs *fregs)
+                struct ftrace_ops *ops, struct ftrace_regs *fregs)
 {
-	struct ftrace_hook *hook = container_of(ops, struct ftrace_hook, ops);
-	if (hook->direct_hook_call && (ops->flags & FTRACE_OPS_FL_IPMODIFY)) {
-		struct pt_regs *regs = ftrace_get_regs(fregs);
+        struct ftrace_hook *hook = container_of(ops, struct ftrace_hook, ops);
+        if (hook->direct_hook_call && (ops->flags & FTRACE_OPS_FL_IPMODIFY)) {
+                struct pt_regs *regs = ftrace_get_regs(fregs);
 #if USE_FENTRY_OFFSET
-		regs->ip = (unsigned long)hook->function;
+                regs->ip = (unsigned long)hook->function;
 #else //USE_FENTRY_OFFSET
-		if (!moocbt_within_module(parent_ip, THIS_MODULE)) {
-			regs->ip = (unsigned long)hook->function;
-		}
+                if (!moocbt_within_module(parent_ip, THIS_MODULE)) {
+                        regs->ip = (unsigned long)hook->function;
+                }
 #endif //USE_FENTRY_OFFSET
-	} else {
-		void (*function)(unsigned long, unsigned long,
-				struct ftrace_ops *, struct ftrace_regs *) = 
-			(void (*)(unsigned long, unsigned long,
-				struct ftrace_ops *, struct ftrace_regs *)) hook->function;
-		if (!moocbt_within_module(parent_ip, THIS_MODULE)) {
-			function(ip, parent_ip, ops, fregs);
-		}
-	}
+        } else {
+                void (*function)(unsigned long, unsigned long,
+                                struct ftrace_ops *, struct ftrace_regs *) =
+                        (void (*)(unsigned long, unsigned long,
+                                struct ftrace_ops *, struct ftrace_regs *)) hook->function;
+                if (!moocbt_within_module(parent_ip, THIS_MODULE)) {
+                        function(ip, parent_ip, ops, fregs);
+                }
+        }
 }
 
 /**

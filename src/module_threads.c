@@ -224,21 +224,21 @@ int snap_mrf_thread(void *data)
  * blocks.
  */
 int snap_read_thread(void *data) {
-	struct snap_device *dev = data;
-	struct bio_queue *bq = &dev->sd_read_bios;
-	struct bio *bio = NULL;
+        struct snap_device *dev = data;
+        struct bio_queue *bq = &dev->sd_read_bios;
+        struct bio *bio = NULL;
 
-	set_user_nice(current, MIN_NICE);
-	while (!kthread_should_stop() || !bio_queue_empty(bq)) {
-		wait_event_interruptible(bq->event, kthread_should_stop() ||
-				!bio_queue_empty(bq));
-		if (bio_queue_empty(bq)) {
-			continue;
-		}
-		bio = bio_queue_dequeue(bq);
-		moocbt_submit_bio(bio);
-	}
-	return 0;
+        set_user_nice(current, MIN_NICE);
+        while (!kthread_should_stop() || !bio_queue_empty(bq)) {
+                wait_event_interruptible(bq->event, kthread_should_stop() ||
+                                !bio_queue_empty(bq));
+                if (bio_queue_empty(bq)) {
+                        continue;
+                }
+                bio = bio_queue_dequeue(bq);
+                moocbt_submit_bio(bio);
+        }
+        return 0;
 }
 #endif //USE_HOOK_TRACER
 

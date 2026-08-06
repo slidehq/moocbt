@@ -10,7 +10,7 @@
 MODULE_LICENSE("GPL");
 
 static inline void dummy(void) {
-	unsigned long flag = FTRACE_OPS_FL_RECURSION_SAFE;
-	(void) flag;
+        unsigned long flag = FTRACE_OPS_FL_RECURSION_SAFE;
+        (void) flag;
 }
 
