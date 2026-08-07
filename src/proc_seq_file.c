@@ -160,6 +160,27 @@ static int moocbt_proc_show(struct seq_file *m, void *v)
         if (dev_ptr == SEQ_START_TOKEN) {
                 seq_printf(m, "{\n");
                 seq_printf(m, "\t\"version\": \"%s\",\n", MOOCBT_VERSION);
+
+                seq_printf(m, "\t\"build_features\": {\n");
+                {
+                        int i = 0;
+#define FEATURE(name, present) \
+        seq_printf(m, "%s\t\t\"%s\": %s", (i++ ? ",\n" : ""), (name), (present) ? "true" : "false");
+                        MOOCBT_BUILD_FEATURE_LIST(FEATURE)
+#undef FEATURE
+                }
+                seq_printf(m, "\n\t},\n");
+
+                seq_printf(m, "\t\"build_symbols\": {\n");
+                {
+                        int i = 0;
+#define SYMBOL(name, present) \
+        seq_printf(m, "%s\t\t\"%s\": %s", (i++ ? ",\n" : ""), (name), (present) ? "true" : "false");
+                        MOOCBT_BUILD_SYMBOL_LIST(SYMBOL)
+#undef SYMBOL
+                }
+                seq_printf(m, "\n\t},\n");
+
                 seq_printf(m, "\t\"devices\": [\n");
         }
 
