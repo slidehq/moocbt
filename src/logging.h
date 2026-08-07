@@ -19,7 +19,6 @@
                         printk(KERN_DEBUG MOOCBT_TAG ": " fmt "\n", ##args);    \
         } while (0)
 
-#define LOG_INFO(fmt, args...) printk(KERN_INFO MOOCBT_TAG ": " fmt "\n", ##args)
 #define LOG_WARN(fmt, args...) printk(KERN_WARNING MOOCBT_TAG ": " fmt "\n", ##args)
 #define LOG_ERROR(error, fmt, args...)                                         \
         printk(KERN_ERR MOOCBT_TAG ": " fmt ": %d\n", ##args, error)
