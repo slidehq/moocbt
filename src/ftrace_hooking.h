@@ -7,10 +7,13 @@
 
 #include <linux/mount.h>
 #include <linux/version.h>
-#include "tracer.h"
+#include <linux/ftrace.h>
 #include "includes.h"
 #include "logging.h"
 #include "bdev_state_handler.h"
+#ifdef MOOCBT_IBT_SUPPORT
+#include "preempt_rethook.h"
+#endif //MOOCBT_IBT_SUPPORT
 
 
 #ifdef HAVE_UAPI_MOUNT_H
@@ -21,29 +24,54 @@ struct ftrace_hook {
 	const char *name;
 	void *function;
 	void *original;
+	unsigned long op_flags;
+	bool direct_hook_call;
 
 	unsigned long address;
 	struct ftrace_ops ops;
 };
 
-#define HOOK(_name, _function, _original)	\
-	{										\
-		.name = (_name),					\
-		.function = (_function),			\
-		.original = (_original),			\
+#define HOOK(_name, _function, _original, _op_flags, _direct_hook_call) \
+	{ \
+		.name = (_name), \
+		.function = (_function), \
+		.original = (_original), \
+		.op_flags = (_op_flags), \
+		.direct_hook_call = (_direct_hook_call), \
 	}
 
 #define USE_FENTRY_OFFSET 0
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5,11,0)
-#define FTRACE_OPS_FL_RECURSION FTRACE_OPS_FL_RECURSION_SAFE
-#define ftrace_regs pt_regs
+#ifdef HAVE_FTRACE_REGS_H
+#include <linux/ftrace_regs.h>
+#endif //HAVE_FTRACE_REGS_H
 
+#ifndef ftrace_regs_get_return_value
+#ifdef ftrace_regs_return_value
+#define ftrace_regs_get_return_value(fregs) \
+	ftrace_regs_return_value(fregs)
+#else //ftrace_regs_get_return_value
+#define ftrace_regs_get_return_value(fregs) \
+	regs_return_value(ftrace_get_regs(fregs))
+#endif //ftrace_regs_return_value
+#endif //ftrace_regs_get_return_value
+
+#ifndef ftrace_regs_get_argument
+#define ftrace_regs_get_argument(fregs, n) \
+	regs_get_kernel_argument(ftrace_get_regs(fregs), n)
+#endif //ftrace_regs_get_argument
+
+#ifndef HAVE_FTRACE_REGS
+#define ftrace_regs pt_regs
 static __always_inline struct pt_regs *ftrace_get_regs(struct ftrace_regs *fregs)
 {
 	return fregs;
 }
-#endif
+#endif //HAVE_FTRACE_REGS
+
+#ifdef HAVE_FTRACE_OPS_FL_RECURSION_SAFE
+#define FTRACE_OPS_FL_RECURSION FTRACE_OPS_FL_RECURSION_SAFE
+#endif //HAVE_FTRACE_OPS_FL_RECURSION_SAFE
 
 #ifndef UMOUNT_NOFOLLOW
 #define UMOUNT_NOFOLLOW 0

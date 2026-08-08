@@ -67,6 +67,10 @@ struct snap_device {
         struct task_struct *sd_mrf_thread; // thread for handling file
                                            // read/writes
         struct bio_queue sd_orig_bios; // list of outstanding original bios
+#ifdef USE_HOOK_TRACER
+	struct task_struct *sd_read_thread; // submits read clones
+	struct bio_queue sd_read_bios; // read clones awaiting submission
+#endif //SUBMIT_BIO_REAL
         struct sset_queue sd_pending_ssets; // list of outstanding sector sets
 #ifndef HAVE_BIOSET_INIT
         //#if LINUX_VERSION_CODE < KERNEL_VERSION(4,18,0)
