@@ -29,4 +29,12 @@
 #include <linux/rwsem.h>
 #include <linux/string.h>
 
+#if defined(BUILD_CPU_HAS_IBT_FORCE_ON) || \
+	(!defined(BUILD_CPU_HAS_IBT_FORCE_OFF) && \
+	defined(BUILD_CPU_HAS_IBT) && CONFIG_X86_KERNEL_IBT)
+#define MOOCBT_IBT_SUPPORT 1
+#define USE_HOOK_TRACER 1
 #endif
+
+#endif
+

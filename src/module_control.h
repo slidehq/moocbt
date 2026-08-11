@@ -15,6 +15,7 @@
 #define SNAP_DEVICE_NAME "moocbt%u"
 #define SNAP_COW_THREAD_NAME_FMT "moocbt_snap_cow%d"
 #define SNAP_MRF_THREAD_NAME_FMT "moocbt_snap_mrf%d"
+#define SNAP_READ_THREAD_NAME_FMT "moocbt_snap_read%d"
 #define INC_THREAD_NAME_FMT "moocbt_inc%d"
 
 // global module parameters

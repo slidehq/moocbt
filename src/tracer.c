@@ -23,6 +23,7 @@
 #include "tracer_helper.h"
 #include "tracing_params.h"
 #include <linux/blk-mq.h>
+#include <linux/sched.h>
 #include <linux/version.h>
 #include "stack_limits.h"
 #ifdef HAVE_BLK_ALLOC_QUEUE
@@ -114,12 +115,15 @@ static int snap_trace_bio(struct snap_device *dev, struct bio *bio)
         // if we don't need to cow this bio just call the real mrf normally
         if (!bio_needs_cow(bio, dev->sd_cow_inode) || tracer_read_fail_state(dev))
         {
-#ifdef HAVE_NONVOID_SUBMIT_BIO_1
+#ifdef USE_HOOK_TRACER
+                // nothing to submit directly, it will be submitted elsewhere
+                return 0;
+#elif defined(HAVE_NONVOID_SUBMIT_BIO_1)
                 return SUBMIT_BIO_REAL(dev, bio);
-#else
+#else //HAVE_NONVOID_SUBMIT_BIO_1
                 SUBMIT_BIO_REAL(dev,bio);
                 return 0;
-#endif
+#endif //USE_HOOK_TRACER
         }
 
         // the cow manager works in 4096 byte blocks, so read clones must also
@@ -138,13 +142,13 @@ static int snap_trace_bio(struct snap_device *dev, struct bio *bio)
         ret = tp_alloc(dev, bio, &tp);
         if (ret)
         {
-                LOG_ERROR(ret, "error tracing bio for snapshot");
+                LOG_ERROR(ret, "error allocating tracing_params when tracing bio for snapshot");
                 tracer_set_fail_state(dev, ret);
-#ifdef USE_BDOPS_SUBMIT_BIO
+#if defined(USE_HOOK_TRACER) || defined(USE_BDOPS_SUBMIT_BIO)
                 goto error;
-#else
+#else //USE_HOOK_TRACER
                 return SUBMIT_BIO_REAL(dev, bio);
-#endif
+#endif //USE_HOOK_TRACER
         }
 
         while (1) {
@@ -163,15 +167,17 @@ static int snap_trace_bio(struct snap_device *dev, struct bio *bio)
                 atomic64_inc(&dev->sd_submitted_cnt);
                 smp_wmb();
 
-#ifdef USE_BDOPS_SUBMIT_BIO
+#ifdef USE_HOOK_TRACER
+                bio_queue_add(&dev->sd_read_bios, new_bio);
+#elif defined(USE_BDOPS_SUBMIT_BIO)
         if(dev->sd_orig_request_fn){
                 SUBMIT_BIO_REAL(dev,new_bio);
         }else{
                 moocbt_submit_bio(new_bio);
         }
-#else
+#else //USE_BDOPS_SUBMIT_BIO
                 moocbt_submit_bio(new_bio);
-#endif
+#endif //USE_HOOK_TRACER
 
                 // if our bio didn't cover the entire clone we must keep creating bios
                 // until we have
@@ -180,26 +186,45 @@ static int snap_trace_bio(struct snap_device *dev, struct bio *bio)
                         pages -= bytes / PAGE_SIZE;
                         continue;
                 }
-                
+
                 break;
         }
-        
-        // drop our reference to the tp
+
+        // drop our reference to the tp. Once the pending read clones drop
+        // theirs, tp_put() hands orig_bio to snap_mrf_thread, which submits it
+        // only after the source blocks have been captured into the snapshot.
         tp_put(tp);
 
+#ifdef USE_HOOK_TRACER
+        // Return 1 to tell the __submit_bio hook not to submit the bio because
+        // snap_mrf_thread will handle submitting it instead.
+        return 1;
+#else //USE_HOOK_TRACER
         return 0;
+#endif //USE_HOOK_TRACER
 
 error:
         LOG_ERROR(ret, "error tracing bio for snapshot");
         tracer_set_fail_state(dev, ret);
 
         // clean up the bio we allocated (but did not submit)
-        if (new_bio)
+        if (new_bio) {
                 bio_free_clone(new_bio);
+                tp_put(tp); // bio_make_read_clone calls tp_get()
+        }
 
-        if (tp)
+        if (tp) {
+                // Dropping the tp reference allows it to submit the original
+                // bio when the read clones complete.
                 tp_put(tp);
-        
+#ifdef USE_HOOK_TRACER
+                // Return 1 to tell the __submit_bio hook not to submit the
+                // bio because snap_mrf_thread will handle submitting it
+                // instead.
+                return 1;
+#endif //USE_HOOK_TRACER
+        }
+
         return 0;
 }
 
@@ -298,9 +323,10 @@ out:
                 tracer_set_fail_state(dev, ret);
                 ret = 0;
         }
-
+#ifndef USE_HOOK_TRACER
         // call the original mrf
         SUBMIT_BIO_REAL(dev,bio);
+#endif //USE_HOOK_TRACER
 
         return ret;
 }
@@ -410,6 +436,9 @@ static void __tracer_init(struct snap_device *dev)
         atomic_set(&dev->sd_active, 0);
         bio_queue_init(&dev->sd_cow_bios);
         bio_queue_init(&dev->sd_orig_bios);
+#ifdef USE_HOOK_TRACER
+        bio_queue_init(&dev->sd_read_bios);
+#endif //USE_HOOK_TRACER
         sset_queue_init(&dev->sd_pending_ssets);
 }
 
@@ -864,6 +893,24 @@ static void __tracer_bioset_exit(struct snap_device *dev)
 #endif
 }
 
+#ifdef USE_HOOK_TRACER
+/**
+ * __tracer_wait_for_read_clones() - Wait for all deferred read clones to
+ *                                   complete.
+ */
+static void __tracer_wait_for_read_clones(struct snap_device *dev) {
+        while (atomic64_read(&dev->sd_submitted_cnt) !=
+                        atomic64_read(&dev->sd_received_cnt)) {
+                // uninterruptible because it is never safe to stop the thread
+                // while read clones are still reading from the device
+                set_current_state(TASK_UNINTERRUPTIBLE);
+                // should only happen in exceptional cases and unmounting, so
+                // the performance of polling every 1ms is acceptable
+                io_schedule_timeout(msecs_to_jiffies(1));
+        }
+}
+#endif //USE_HOOK_TRACER
+
 /**
  * __tracer_destroy_snap() - Tears down a snap device.
  *
@@ -872,11 +919,28 @@ static void __tracer_bioset_exit(struct snap_device *dev)
 static void __tracer_destroy_snap(struct snap_device *dev)
 {
         LOG_DEBUG("tracer_destroy_snap");
+
+#ifdef USE_HOOK_TRACER
+        // ensure all read clones are processed so write bios being deferred
+        // are not lost when the snap device is destroyed
+        if (dev->sd_read_thread) {
+                __tracer_wait_for_read_clones(dev);
+        }
+#endif //USE_HOOK_TRACER
+
         if (dev->sd_mrf_thread) {
                 LOG_DEBUG("stopping mrf thread");
                 kthread_stop(dev->sd_mrf_thread);
                 dev->sd_mrf_thread = NULL;
         }
+
+#ifdef USE_HOOK_TRACER
+        if (dev->sd_read_thread) {
+                LOG_DEBUG("stopping read thread");
+                kthread_stop(dev->sd_read_thread);
+                dev->sd_read_thread = NULL;
+        }
+#endif //USE_HOOK_TRACER
 
         if (dev->sd_gd) {
                 LOG_DEBUG("freeing gendisk");
@@ -1063,6 +1127,18 @@ static int __tracer_setup_snap(struct snap_device *dev, unsigned int minor,
                 LOG_ERROR(ret, "error starting mrf kernel thread");
                 goto error;
         }
+
+#ifdef USE_HOOK_TRACER
+        LOG_DEBUG("starting read clone kernel thread");
+        dev->sd_read_thread = kthread_run(snap_read_thread, dev,
+                        SNAP_READ_THREAD_NAME_FMT, minor);
+        if (IS_ERR(dev->sd_read_thread)) {
+                ret = PTR_ERR(dev->sd_read_thread);
+                dev->sd_read_thread = NULL;
+                LOG_ERROR(ret, "error starting read clone kernel thread");
+                goto error;
+        }
+#endif //USE_HOOK_TRACER
 
         // register gendisk with the kernel
         LOG_DEBUG("adding disk");
@@ -1283,9 +1359,8 @@ static int __tracer_transition_tracing(
 #endif
 {
         int ret;
-        struct super_block* sb = NULL;
+        struct super_block *sb = NULL;
         bool freezed;
-        MAYBE_UNUSED(ret);
 
         ret = __try_freeze_bdev(bdev, &sb);
         if (ret == 0) {
@@ -1306,6 +1381,19 @@ static int __tracer_transition_tracing(
                 freezed = false;
         }
         smp_wmb();
+#ifdef USE_HOOK_TRACER
+        if (start_tracing) {
+                LOG_DEBUG("starting tracing");
+                *dev_ptr = dev;
+                smp_wmb();
+                atomic_inc(&(*dev_ptr)->sd_active);
+        } else {
+                LOG_DEBUG("stopping tracing");
+                atomic_dec(&(*dev_ptr)->sd_active);
+                *dev_ptr = NULL;
+                smp_wmb();
+        }
+#else //USE_HOOK_TRACER
         if(start_tracing){
                 LOG_DEBUG("starting tracing");
                 *dev_ptr = dev;
@@ -1351,9 +1439,10 @@ static int __tracer_transition_tracing(
                 *dev_ptr = NULL;
                 smp_wmb();
         }
-        if(freezed){
+#endif //USE_HOOK_TRACER
+        if (freezed) {
                 ret = __try_thaw_bdev(bdev, sb);
-                // thaws failures are ignored as we can't undo what we have already done
+                // thaw failures are ignored as we can't undo what we have already done
         }
         return 0;
 }
@@ -1442,6 +1531,49 @@ out:
 		put_snap_device_array_nolock(snap_devices);
         MRF_RETURN(ret);
 }
+
+#ifdef USE_HOOK_TRACER
+/**
+ * moocbt_trace_bio() - Traces a bio.
+ *
+ * @bio: the &struct bio the kernel is about to submit.
+ *
+ * Return:
+ * * 1 - the bio is deferred for COW operations, and should not be submitted
+ *       directly.
+ * * 0 - the bio is safe to submit directly.
+ */
+int moocbt_trace_bio(struct bio *bio) {
+        int ret = 0;
+        int i = 0;
+        struct snap_device *dev = NULL;
+        snap_device_array snap_devices = get_snap_device_array_nolock();
+
+        smp_rmb();
+        tracer_for_each(dev, i) {
+                if (!tracer_is_bio_for_dev(dev, bio)) {
+                        continue;
+                }
+                if (moocbt_bio_op_flagged(bio, MOOCBT_PASSTHROUGH)) {
+                        moocbt_bio_op_clear_flag(bio, MOOCBT_PASSTHROUGH);
+                        continue;
+                }
+                if (tracer_should_trace_bio(dev, bio)) {
+                        if (test_bit(SNAPSHOT, &dev->sd_state)) {
+                                ret = snap_trace_bio(dev, bio);
+                        } else {
+                                ret = inc_trace_bio(dev, bio);
+                        }
+                        break;
+                }
+        }
+        // Bios which reach here are either:
+        // 1. Not destined for a snapshot block device
+        // 2. Let through because they had the passthrough flag
+        put_snap_device_array_nolock(snap_devices);
+        return ret;
+}
+#endif //USE_HOOK_TRACER
 
 #ifndef USE_BDOPS_SUBMIT_BIO
 
@@ -1549,12 +1681,14 @@ int tracer_alloc_ops(struct snap_device* dev){
                 return -ENOMEM;
         }
         memcpy(trops->bd_ops, moocbt_get_bd_ops(dev->sd_base_dev->bdev),sizeof(struct block_device_operations));
+#ifndef USE_HOOK_TRACER
         trops->bd_ops->submit_bio = tracing_fn;
 #ifdef HAVE_BD_HAS_SUBMIT_BIO
         trops->has_submit_bio=dev->sd_base_dev->bdev->bd_has_submit_bio;
 #elif defined HAVE_BDEV_SET_FLAG
         trops->has_submit_bio = bdev_test_flag(dev->sd_base_dev->bdev, BD_HAS_SUBMIT_BIO);
 #endif
+#endif //USE_HOOK_TRACER
         atomic_set(&trops->refs, 1);
 	dev->sd_tracing_ops = trops;
 	return 0;       
@@ -1730,7 +1864,11 @@ static int __tracer_setup_tracing(struct snap_device *dev, unsigned int minor, s
         ret = __tracer_transition_tracing(
                 dev,
                 dev->sd_base_dev->bdev,
+#ifdef USE_HOOK_TRACER
+                NULL,
+#else //USE_HOOK_TRACER
                 tracing_fn,
+#endif //USE_HOOK_TRACER
                 &snap_devices[minor],
                 true);
 #else
@@ -1751,7 +1889,11 @@ static int __tracer_setup_tracing(struct snap_device *dev, unsigned int minor, s
                 ret = __tracer_transition_tracing(
                         dev,
                         dev->sd_base_dev->bdev,
+#ifdef USE_HOOK_TRACER
+                        NULL,
+#else //USE_HOOK_TRACER
                         dev->sd_tracing_ops->bd_ops,
+#endif //USE_HOOK_TRACER
                         &snap_devices[minor],
                         true);
         }

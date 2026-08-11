@@ -7,6 +7,11 @@
 #include "tracer_helper.h"
 #include "proc_seq_file.h"
 
+#ifdef CONFIG_X86
+#include <asm/processor.h>
+#include <asm/cpufeature.h>
+#endif //CONFIG_X86
+
 static void *moocbt_proc_start(struct seq_file *m, loff_t *pos);
 static void *moocbt_proc_next(struct seq_file *m, void *v, loff_t *pos);
 static void moocbt_proc_stop(struct seq_file *m, void *v);
@@ -143,6 +148,66 @@ static void moocbt_proc_stop(struct seq_file *m, void *v)
         current_snap_devices = NULL;
 }
 
+static void moocbt_proc_ibt_show(struct seq_file *m) {
+        int cpu_build_support = 0;
+        int cpu_runtime_support = 0;
+        int kernel_build_support = 0;
+        int kernel_runtime_support = 0;
+        int driver_support_force_on = 0;
+        int driver_support_force_off = 0;
+        int net_ibt_support_enabled = 0;
+        int i = 0;
+
+#ifdef BUILD_CPU_HAS_IBT
+        cpu_build_support = 1;
+#endif //BUILD_CPU_HAS_IBT
+#ifdef CONFIG_X86
+        // Read CPUID directly which reflects the physical CPU. Value is
+        // independent of the kernel build config and runtime "ibt" parameter.
+        // Leaf 7 only exists when the CPU reports a max basic leaf >= 7.
+        // Older CPUs can return another leaf's data if it doesn't exist.
+        if (boot_cpu_data.cpuid_level >= 7) {
+                // CPUID.(EAX=7, ECX=0):EDX[20] is CET_IBT.
+                unsigned int eax, ebx, ecx, edx;
+                cpuid_count(7, 0, &eax, &ebx, &ecx, &edx);
+                cpu_runtime_support = !!(edx & (1u << 20));
+        }
+#endif //CONFIG_X86
+#ifdef CONFIG_X86_KERNEL_IBT
+        kernel_build_support = 1;
+#endif //CONFIG_X86_KERNEL_IBT
+#if defined(CONFIG_X86) && defined(X86_FEATURE_IBT)
+        kernel_runtime_support = !!cpu_feature_enabled(X86_FEATURE_IBT);
+#endif //CONFIG_X86 && X86_FEATURE_IBT
+#ifdef BUILD_CPU_HAS_IBT_FORCE_ON
+        driver_support_force_on = 1;
+#endif //BUILD_CPU_HAS_IBT_FORCE_ON
+#ifdef BUILD_CPU_HAS_IBT_FORCE_OFF
+        driver_support_force_off = 1;
+#endif //BUILD_CPU_HAS_IBT_FORCE_OFF
+#ifdef MOOCBT_IBT_SUPPORT
+        net_ibt_support_enabled = 1;
+#endif
+
+        seq_printf(m, "\t\"ibt_status\": {\n");
+
+#define STATUS(name, present) \
+        seq_printf(m, "%s\t\t\"%s\": %s", (i++ ? ",\n" : ""), (name), (present) ? "true" : "false");
+
+        STATUS("cpu_build_support", cpu_build_support);
+        STATUS("cpu_runtime_support", cpu_runtime_support);
+        STATUS("kernel_build_support", kernel_build_support);
+        STATUS("kernel_runtime_support", kernel_runtime_support);
+        STATUS("driver_support_force_on", driver_support_force_on);
+        STATUS("driver_support_force_off", driver_support_force_off);
+        STATUS("net_ibt_support_enabled", net_ibt_support_enabled);
+
+#undef STATUS
+
+        seq_printf(m, "\n\t},\n");
+
+}
+
 /** moocbt_proc_show() - Outputs information about a @snap_device.  Optionally
  *                        adds header and/or footer.
  * @m: The seq_file structure.
@@ -180,6 +245,8 @@ static int moocbt_proc_show(struct seq_file *m, void *v)
 #undef SYMBOL
                 }
                 seq_printf(m, "\n\t},\n");
+
+                moocbt_proc_ibt_show(m);
 
                 seq_printf(m, "\t\"devices\": [\n");
         }
