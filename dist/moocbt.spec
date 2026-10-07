@@ -143,7 +143,7 @@
 
 
 Name:            moocbt
-Version:         0.12.6
+Version:         0.13.1
 Release:         1%{?dist}
 Summary:         Kernel module and utilities for enabling low-level live backups
 Vendor:          Project Orca Inc.
@@ -660,6 +660,13 @@ rm %{_systemd_shutdown}/moocbt_umount_rootfs.shutdown
 rm %{_systemd_services}/moocbt-umount-rootfs.service
 
 %changelog
+* Wed Oct 7 2026 Spencer Warren <spencer@slide.tech> - 0.13.1
+- Fix checks for REQ_OP_WRITE_ZEROES
+- Fix feature tests failing due to unused variable warnings
+- Fix IO spam to COW files
+- Support for IBT
+- Add feature and symbol test status to /proc/ file
+
 * Mon Jul 27 2026 Cole Stowell <cole@slide.tech> - 0.12.6
 - Remove CONFIG_X86_KERNEL_IBT compatibility check for ftrace
 - Fix leaked superblock on umount
